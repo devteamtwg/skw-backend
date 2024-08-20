@@ -32,10 +32,13 @@ const user_all = (req,res) => {
 
 const user_detail = (req,res) => {
     let id = req.params.id
+    console.log("user_detail controller:", req.body)
     run()
     async function run(){
         try{
             const users = await User.findById(id)
+            console.log("user_detail controller:", users)
+            
             res.status(200).json({data:users})
         }
         catch(e){
