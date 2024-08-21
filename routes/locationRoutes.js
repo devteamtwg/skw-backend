@@ -12,6 +12,7 @@ router.delete('/:id',locationController.location_delete)
 router.get('/hldata/:id',locationController.hl_all)
 router.post('/hldata/',locationController.hl_data)
 router.patch('/hldata/cid/:id',locationController.hl_data_cid)
+router.patch('/update/service',locationController.update_location_service)
 
 
 module.exports = router

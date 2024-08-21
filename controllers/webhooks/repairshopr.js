@@ -2,17 +2,17 @@ const Locationhl = require("../../models/locationhl");
 const Client = require("../../models/client");
 const { default: axios } = require("axios");
 
-// Customer Created in Syncro
+// Customer Created in RepairShopr
 const handleCustomerCreation = async (req, res) => {
   // const date = new Date();
   // console.log(
-  //   `Customer Created in Syncro at ${date.toLocaleTimeString()}`,
+  //   `Customer Created in RepairShopr at ${date.toLocaleTimeString()}`,
   //   req.body
   // );
 
-  const syncroCustomer = req.body;
+  const repairShoprCustomer = req.body;
 
-  const url = syncroCustomer.link;
+  const url = repairShoprCustomer.link;
   const subdomain = url.split(".")[0].replace("https://", "");
 
   const customerLocation = await Locationhl.findOne({
@@ -20,15 +20,15 @@ const handleCustomerCreation = async (req, res) => {
   });
 
   const payload = {
-    email: syncroCustomer.attributes.email,
-    phone: syncroCustomer.attributes.phone,
-    firstName: syncroCustomer.attributes.firstname,
-    lastName: syncroCustomer.attributes.lastname,
-    name: syncroCustomer.attributes.fullname,
-    address1: syncroCustomer.attributes.address,
-    city: syncroCustomer.attributes.city,
-    state: syncroCustomer.attributes.state,
-    country: syncroCustomer.attributes.country,
+    email: repairShoprCustomer.attributes.email,
+    phone: repairShoprCustomer.attributes.phone,
+    firstName: repairShoprCustomer.attributes.firstname,
+    lastName: repairShoprCustomer.attributes.lastname,
+    name: repairShoprCustomer.attributes.fullname,
+    address1: repairShoprCustomer.attributes.address,
+    city: repairShoprCustomer.attributes.city,
+    state: repairShoprCustomer.attributes.state,
+    country: repairShoprCustomer.attributes.country,
     locationId: customerLocation.hl_location_id,
   };
 
@@ -38,7 +38,7 @@ const handleCustomerCreation = async (req, res) => {
     const duplicateCustomerRes = await axios.get(
       `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${
         customerLocation.hl_location_id
-      }&email=${encodeURIComponent(syncroCustomer.email)}`,
+      }&email=${encodeURIComponent(repairShoprCustomer.email)}`,
       {
         headers: {
           Authorization: `Bearer ${customerLocation.hl_access_token}`,
@@ -61,7 +61,7 @@ const handleCustomerCreation = async (req, res) => {
           }
         );
         // console.log("highlevelCustomerRes", highlevelCustomerRes.data);
-        console.log("Syncro Customer Synced with Highlevel Successfully");
+        console.log("RepairShopr Customer Synced with Highlevel Successfully");
       } catch (error) {
         console.error(error.response);
       }
@@ -73,18 +73,18 @@ const handleCustomerCreation = async (req, res) => {
   res.status(200).send("Webhook received successfully");
 };
 
-// Ticket Status changed in Syncro
+// Ticket Status changed in RepairShopr
 const handleTicketStatusChanged = async (req, res) => {
   // const date = new Date();
   // console.log(
-  //   `Ticket Status Changed in Syncro at ${date.toLocaleTimeString()}`,
+  //   `Ticket Status Changed in RepairShopr at ${date.toLocaleTimeString()}`,
   //   req.body
   // );
 
-  const syncroTicket = req.body;
-  const { customer, status } = syncroTicket.attributes;
+  const repairShoprTicket = req.body;
+  const { customer, status } = repairShoprTicket.attributes;
 
-  const url = syncroTicket.link;
+  const url = repairShoprTicket.link;
   const subdomain = url.split(".")[0].replace("https://", "");
 
   const customerLocation = await Locationhl.findOne({
@@ -145,18 +145,18 @@ const handleTicketStatusChanged = async (req, res) => {
   res.status(200).send("Webhook received successfully");
 };
 
-// Invoice is Paid in Syncro
+// Invoice is Paid in RepairShopr
 const handleInvoicePaid = async (req, res) => {
   // const date = new Date();
   // console.log(
-  //   `An Invoice is Paid in Syncro at ${date.toLocaleTimeString()}`,
+  //   `An Invoice is Paid in RepairShopr at ${date.toLocaleTimeString()}`,
   //   req.body
   // );
 
-  const syncroInvoice = req.body;
-  const { customer, success } = syncroInvoice.attributes;
+  const repairShoprInvoice = req.body;
+  const { customer, success } = repairShoprInvoice.attributes;
 
-  const url = syncroInvoice.link;
+  const url = repairShoprInvoice.link;
   const subdomain = url.split(".")[0].replace("https://", "");
 
   const customerLocation = await Locationhl.findOne({

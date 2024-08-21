@@ -8,6 +8,5 @@ router.get('/:id',clientController.client_detail)
 router.post('/',clientController.client_create)
 router.patch('/:id',clientController.client_update)
 router.delete('/:id',clientController.client_delete)
-router.patch('/:id/updateService',clientController.update_client_service)
 
 module.exports = router

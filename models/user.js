@@ -20,9 +20,6 @@ const userSchema = mongoose.Schema(
     role: String,
     img: String,
     status: String,
-    serviceUsing: String,
-    serviceApiKey: String,
-    serviceSubdomain: String,
   },
   {
     timestamps: true,

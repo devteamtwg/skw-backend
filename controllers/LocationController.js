@@ -154,6 +154,31 @@ const hl_data_cid = (req, res) => {
   }
 };
 
+// Update Location's Service
+
+const update_location_service = async (req, res) => {
+  const { serviceUsing, serviceApiKey, serviceSubdomain, locationId } =
+    req.body;
+
+  try {
+    const updatedLocation = await Locationhl.updateOne(
+      { hl_location_id: locationId },
+      {
+        $set: {
+          serviceUsing,
+          serviceApiKey,
+          serviceSubdomain,
+        },
+      }
+    );
+
+    res.status(200).json({ data: updatedLocation });
+  } catch (error) {
+    res.status(500).json({ error: "Something went wrong" });
+    console.log(error);
+  }
+};
+
 module.exports = {
   location_all,
   location_detail,
@@ -163,4 +188,5 @@ module.exports = {
   hl_all,
   hl_data,
   hl_data_cid,
+  update_location_service,
 };

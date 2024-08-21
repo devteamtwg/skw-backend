@@ -22,9 +22,6 @@ const clientSchema = mongoose.Schema(
     phone: String,
     notes: String,
     status: String,
-    serviceUsing: String,
-    serviceApiKey: String,
-    serviceSubdomain: String,
   },
   {
     timestamps: true,

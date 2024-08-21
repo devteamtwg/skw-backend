@@ -1,5 +1,3 @@
-const Client = require("../models/client");
-const User = require("../models/user");
 const Location = require("../models/location");
 const Locationhl = require("../models/locationhl");
 const { ObjectId } = require("mongodb");
@@ -126,45 +124,10 @@ const client_delete = (req, res) => {
     }
   }
 };
-
-const update_client_service = async (req, res) => {
-  let id = req.params.id;
-  const { service, serviceApiKey, serviceSubdomain } = req.body;
-
-  try {
-    const updatedService = await Client.updateOne(
-      { user_id: id },
-      {
-        $set: {
-          serviceUsing: service,
-          serviceApiKey,
-          serviceSubdomain,
-        },
-      }
-    );
-    const updateUser = await User.updateOne(
-      { _id: new ObjectId(id) },
-      {
-        $set: {
-          serviceUsing: service,
-          serviceApiKey,
-          serviceSubdomain,
-        },
-      }
-    );
-    // console.log(updatedService);
-    res.status(200).json({ data: updatedService });
-  } catch (error) {
-    res.status(500).json({ error: "Something went wrong" });
-    console.log(error);
-  }
-};
-
 module.exports = {
   client_all,
   client_detail,
   client_create,
   client_update,
   client_delete,
-  update_client_service,
 };
