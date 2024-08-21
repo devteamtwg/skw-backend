@@ -4,7 +4,7 @@ const {
   handleCustomerCreation,
   handleTicketStatusChanged,
   handleInvoicePaid,
-} = require("../../controllers/webhooks/syncro");
+} = require("../../controllers/webhooks/repairshopr");
 
 router.post("/customerCreated/sync", handleCustomerCreation);
 router.post("/ticketStatusChanged/sync", handleTicketStatusChanged);
