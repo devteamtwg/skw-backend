@@ -161,6 +161,12 @@ const update_location_service = async (req, res) => {
     req.body;
 
   try {
+    const findSubdomain = await Locationhl.findOne({ serviceSubdomain });
+
+    if (findSubdomain) {
+      res.status(400).json({ message: "This Subdomain is already taken" });
+      return;
+    }
     const updatedLocation = await Locationhl.updateOne(
       { hl_location_id: locationId },
       {

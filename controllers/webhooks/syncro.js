@@ -4,16 +4,16 @@ const { default: axios } = require("axios");
 
 // Customer Created in Syncro
 const handleCustomerCreation = async (req, res) => {
-  // const date = new Date();
-  // console.log(
-  //   `Customer Created in Syncro at ${date.toLocaleTimeString()}`,
-  //   req.body
-  // );
+  const date = new Date();
+  console.log(
+    `Customer Created in Syncro at ${date.toLocaleTimeString()}`,
+    req.body
+  );
 
   const syncroCustomer = req.body;
 
   const url = syncroCustomer.link;
-  const subdomain = url.split(".")[0].replace("https://", "");
+  const subdomain = url?.split(".")[0]?.replace("https://", "");
 
   const customerLocation = await Locationhl.findOne({
     serviceSubdomain: subdomain,
@@ -46,7 +46,7 @@ const handleCustomerCreation = async (req, res) => {
         },
       }
     );
-    // console.log("duplicateCustomerRes", duplicateCustomerRes.data);
+    console.log("duplicateCustomerRes", duplicateCustomerRes.data);
 
     if (duplicateCustomerRes.data.contact == null) {
       try {
@@ -60,8 +60,10 @@ const handleCustomerCreation = async (req, res) => {
             },
           }
         );
-        // console.log("highlevelCustomerRes", highlevelCustomerRes.data);
-        console.log("Syncro Customer Synced with Highlevel Successfully");
+        console.log(
+          "Syncro Customer Synced with Highlevel Successfully",
+          highlevelCustomerRes.data
+        );
       } catch (error) {
         console.error(error.response);
       }
@@ -85,7 +87,7 @@ const handleTicketStatusChanged = async (req, res) => {
   const { customer, status } = syncroTicket.attributes;
 
   const url = syncroTicket.link;
-  const subdomain = url.split(".")[0].replace("https://", "");
+  const subdomain = url?.split(".")[0]?.replace("https://", "");
 
   const customerLocation = await Locationhl.findOne({
     serviceSubdomain: subdomain,
@@ -132,7 +134,10 @@ const handleTicketStatusChanged = async (req, res) => {
             },
           }
         );
-        // console.log(addTagRes.data);
+        console.log(
+          `Tag added in Highlevel's customer ${customer.firstName}`,
+          addTagRes.data
+        );
       } catch (error) {
         console.error(error);
       }
@@ -157,7 +162,7 @@ const handleInvoicePaid = async (req, res) => {
   const { customer, success } = syncroInvoice.attributes;
 
   const url = syncroInvoice.link;
-  const subdomain = url.split(".")[0].replace("https://", "");
+  const subdomain = url?.split(".")[0]?.replace("https://", "");
 
   const customerLocation = await Locationhl.findOne({
     serviceSubdomain: subdomain,
@@ -204,6 +209,10 @@ const handleInvoicePaid = async (req, res) => {
           }
         );
         // console.log(addTagRes.data);
+        console.log(
+          `Tag added in Highlevel's customer ${customer.firstName}`,
+          addTagRes.data
+        );
       } catch (error) {
         console.error(error);
       }

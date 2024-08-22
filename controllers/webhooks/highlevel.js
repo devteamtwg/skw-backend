@@ -1,6 +1,7 @@
 const { default: axios } = require("axios");
 const Locationhl = require("../../models/locationhl");
 const Client = require("../../models/client");
+const ActivityLog = require("../../models/activity");
 
 // Customer Created in Highlevel
 const handleCustomerCreation = async (req, res) => {
@@ -15,13 +16,10 @@ const handleCustomerCreation = async (req, res) => {
     hl_location_id: highlevelCustomer.location.id,
   });
 
-  const business = await Client.findOne({
-    user_id: customerLocation.user_id,
-  });
+  // console.log("customerLocation", customerLocation)
 
-  // Create customer in Syncro
+  // Create customer in Syncro/RepairShopr
   const payload = {
-    hl_customer_id: highlevelCustomer.contact_id, // Custom Field
     business_name: "",
     firstname: highlevelCustomer.first_name,
     lastname: highlevelCustomer.last_name,
@@ -40,45 +38,115 @@ const handleCustomerCreation = async (req, res) => {
 
   // Check Syncro/RepairShopr if user already exists
   if (
-    business.serviceUsing == "Syncro" ||
-    business.serviceUsing == "RepairShopr"
+    customerLocation.serviceUsing == "Syncro" ||
+    customerLocation.serviceUsing == "RepairShopr"
   ) {
     try {
-      const syncroCustomerRes = await axios.get(
-        `https://${business.serviceSubdomain}.${
-          business.serviceUsing == "Syncro" ? "syncromsp" : "repairshopr"
+      const duplicateCustomerRes = await axios.get(
+        `https://${customerLocation.serviceSubdomain}.${
+          customerLocation.serviceUsing == "Syncro"
+            ? "syncromsp"
+            : "repairshopr"
         }.com/api/v1/customers/autocomplete?query=${highlevelCustomer.email}`,
         {
           headers: {
-            Authorization: business.serviceApiKey,
+            Authorization: customerLocation.serviceApiKey,
           },
         }
       );
-      console.log("syncroCustomerRes", syncroCustomerRes.data.customers);
+      console.log("duplicateCustomerRes", duplicateCustomerRes.data.customers);
 
-      if (syncroCustomerRes.data.customers.length == 0) {
+      if (duplicateCustomerRes.data.customers.length == 0) {
         try {
           const res = await axios.post(
-            `https://${business.serviceSubdomain}.${
-              business.serviceUsing == "Syncro" ? "syncromsp" : "repairshopr"
+            `https://${customerLocation.serviceSubdomain}.${
+              customerLocation.serviceUsing == "Syncro"
+                ? "syncromsp"
+                : "repairshopr"
             }.com/api/v1/customers`,
             payload,
             {
               headers: {
-                Authorization: business.serviceApiKey,
+                Authorization: customerLocation.serviceApiKey,
               },
             }
           );
           console.log(
-            `customer synced with ${business.serviceUsing} successfully`
+            `customer synced with ${customerLocation.serviceUsing} successfully`
           );
-          // console.log(res.data);
+          console.log(res.data);
+          // Log success
+          await ActivityLog.create({
+            user_id: customerLocation.user_id,
+            eventType: "Success",
+            message: `Customer synced with ${customerLocation.serviceUsing} successfully`,
+            customData: res.data,
+          });
         } catch (error) {
-          console.log(error.response.data);
+          console.log(
+            `error creating customer in ${customerLocation.serviceUsing}`,
+            error
+          );
+
+          // Log failure
+          await ActivityLog.create({
+            user_id: customerLocation.user_id,
+            eventType: "Failure",
+            message: `Error creating customer in ${customerLocation.serviceUsing}: ${error.message}`,
+            customData: error.response ? error.response.data : {},
+          });
         }
       }
     } catch (error) {
-      console.log(error.response.data);
+      console.log(error);
+    }
+  }
+
+  // Create customer in RepairDesk
+  else if (customerLocation.serviceUsing == "RepairDesk") {
+    const formattedEmail = highlevelCustomer?.email?.replace("+", "");
+    try {
+      const findCustomerRes = await axios.get(
+        `https://api.repairdesk.co/api/web/v1/customers?api_key=${customerLocation.serviceApiKey}&keyword=${formattedEmail}`
+      );
+      // console.log("findCustomerRes", findCustomerRes.data.data.customerData);
+      if (findCustomerRes.data.data.customerData.length === 0) {
+        const createCustomerRes = await axios.post(
+          `https://api.repairdesk.co/api/web/v1/customers?api_key=${customerLocation.serviceApiKey}`,
+          {
+            first_name: payload.firstname,
+            last_name: payload.lastname,
+            phone: payload.phone,
+            address1: payload.address,
+            email: payload.email,
+          }
+        );
+        console.log(
+          "customer created in RepairDesk Successfully"
+          // createCustomerRes.data
+        );
+
+        if (createCustomerRes.data.success) {
+          // Log success
+          await ActivityLog.create({
+            user_id: customerLocation.user_id,
+            eventType: "Success",
+            message: `Customer synced with ${customerLocation.serviceUsing} successfully`,
+            customData: createCustomerRes.data,
+          });
+        } else {
+          throw createCustomerRes.data;
+        }
+      }
+    } catch (error) {
+      console.log(error);
+
+      // Log failure
+      await ActivityLog.create({
+        eventType: "Failure",
+        message: `Error creating customer in ${customerLocation.serviceUsing}: ${error.message}`,
+        customData: error,
+      });
     }
   }
   res.status(200).send("Webhook received successfully");
@@ -86,20 +154,16 @@ const handleCustomerCreation = async (req, res) => {
 
 // Appointment Booked in Highlevel
 const handleAppointmentBooked = async (req, res) => {
-  // const date = new Date();
-  // console.log(
-  //   `Appointment Booked in Highlevel at ${date.toLocaleTimeString()}:`,
-  //   req.body
-  // );
+  const date = new Date();
+  console.log(
+    `Appointment Booked in Highlevel at ${date.toLocaleTimeString()}:`,
+    req.body
+  );
 
   const bookedAppointment = req.body;
 
   const customerLocation = await Locationhl.findOne({
     hl_location_id: bookedAppointment.location.id,
-  });
-
-  const business = await Client.findOne({
-    user_id: customerLocation.user_id,
   });
 
   const payload = {
@@ -113,23 +177,52 @@ const handleAppointmentBooked = async (req, res) => {
   };
 
   if (
-    business.serviceUsing == "Syncro" ||
-    business.serviceUsing == "RepairShopr"
+    customerLocation.serviceUsing == "Syncro" ||
+    customerLocation.serviceUsing == "RepairShopr"
   ) {
     // Create Lead in Syncro/RepairShopr
     try {
       const res = await axios.post(
-        `https://${business.serviceSubdomain}.${
-          business.serviceUsing == "Syncro" ? "syncromsp" : "repairshopr"
+        `https://${customerLocation.serviceSubdomain}.${
+          customerLocation.serviceUsing == "Syncro"
+            ? "syncromsp"
+            : "repairshopr"
         }.com/api/v1/leads`,
         payload,
         {
           headers: {
-            Authorization: business.serviceApiKey,
+            Authorization: customerLocation.serviceApiKey,
           },
         }
       );
-      console.log(`lead created in ${business.serviceUsing}`, res.data);
+      console.log(`lead created in ${customerLocation.serviceUsing}`, res.data);
+    } catch (error) {
+      console.log(error.response);
+    }
+  }
+
+  // Create lead in RepairDesk
+  else if (customerLocation.serviceUsing == "RepairDesk") {
+    try {
+      const res = await axios.post(
+        `https://api.repairdesk.co/api/web/v1/appointment/create?api_key=${customerLocation.serviceApiKey}`,
+        {
+          summary: {
+            firstName: payload.first_name,
+            lastName: payload.last_name,
+            email: payload.email,
+            mobile: payload.phone,
+            address: payload.address,
+          },
+          devices: [],
+        },
+        {
+          headers: {
+            Authorization: customerLocation.serviceApiKey,
+          },
+        }
+      );
+      console.log(`lead created in ${customerLocation.serviceUsing}`, res.data);
     } catch (error) {
       console.log(error.response);
     }
