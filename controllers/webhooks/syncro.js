@@ -1,6 +1,7 @@
 const Locationhl = require("../../models/locationhl");
 const Client = require("../../models/client");
 const { default: axios } = require("axios");
+const ActivityLog = require("../../models/activity");
 
 // Customer Created in Syncro
 const handleCustomerCreation = async (req, res) => {
@@ -69,8 +70,24 @@ const handleCustomerCreation = async (req, res) => {
           "Syncro Customer Synced with Highlevel Successfully",
           highlevelCustomerRes.data
         );
+
+        // Log success
+        await ActivityLog.create({
+          user_id: customerLocation.user_id,
+          eventType: "Success",
+          message: `Syncro Customer Synced with Highlevel Successfully`,
+          customData: highlevelCustomerRes.data,
+        });
       } catch (error) {
         console.error(error.response);
+
+        // Log failure
+        await ActivityLog.create({
+          user_id: customerLocation.user_id,
+          eventType: "Failure",
+          message: `Error syncing customer in Highlevel`,
+          customData: error.response ? error.response.data : error,
+        });
       }
     }
   } catch (error) {
@@ -148,12 +165,36 @@ const handleTicketStatusChanged = async (req, res) => {
           `Tag added in Highlevel's customer ${customer.firstName}`,
           addTagRes.data
         );
+
+        // Log success
+        await ActivityLog.create({
+          user_id: customerLocation.user_id,
+          eventType: "Success",
+          message: `Tag added in Highlevel's customer ${customer.firstName}`,
+          customData: addTagRes.data,
+        });
       } catch (error) {
         console.error(error);
+
+        // Log failure
+        await ActivityLog.create({
+          user_id: customerLocation.user_id,
+          eventType: "Failure",
+          message: `Error adding tag in Highlevel's Customer ${customer.firstName}`,
+          customData: error.response ? error.response.data : error,
+        });
       }
     }
   } catch (error) {
     console.error(error.response);
+
+    // Log failure
+    await ActivityLog.create({
+      user_id: customerLocation.user_id,
+      eventType: "Failure",
+      message: `Error adding tag in Highlevel's Customer ${customer.firstName}`,
+      customData: error.response ? error.response.data : error,
+    });
   }
 
   // Create a tag in Highlevel
@@ -228,12 +269,36 @@ const handleInvoicePaid = async (req, res) => {
           `Tag added in Highlevel's customer ${customer.firstName}`,
           addTagRes.data
         );
+
+        // Log success
+        await ActivityLog.create({
+          user_id: customerLocation.user_id,
+          eventType: "Success",
+          message: `Tag added in Highlevel's customer ${customer.firstName}`,
+          customData: addTagRes.data,
+        });
       } catch (error) {
         console.error(error);
+
+        // Log failure
+        await ActivityLog.create({
+          user_id: customerLocation.user_id,
+          eventType: "Failure",
+          message: `Error adding tag in Highlevel's Customer ${customer.firstName}`,
+          customData: error.response ? error.response.data : error,
+        });
       }
     }
   } catch (error) {
     console.error(error.response);
+
+    // Log failure
+    await ActivityLog.create({
+      user_id: customerLocation.user_id,
+      eventType: "Failure",
+      message: `Error adding tag in Highlevel's Customer ${customer.firstName}`,
+      customData: error.response ? error.response.data : error,
+    });
   }
 
   // Create a tag in Highlevel

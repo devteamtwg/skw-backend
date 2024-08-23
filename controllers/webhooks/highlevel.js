@@ -206,8 +206,23 @@ const handleAppointmentBooked = async (req, res) => {
         }
       );
       console.log(`lead created in ${customerLocation.serviceUsing}`, res.data);
+
+      // Log success
+      await ActivityLog.create({
+        user_id: customerLocation.user_id,
+        eventType: "Success",
+        message: `Lead created in ${customerLocation.serviceUsing} successfully`,
+        customData: res.data,
+      });
     } catch (error) {
       console.log(error.response);
+      // Log failure
+      await ActivityLog.create({
+        user_id: customerLocation.user_id,
+        eventType: "Failure",
+        message: `Error creating lead in ${customerLocation.serviceUsing}: ${error.response.data.message}`,
+        customData: error.response ? error.response.data : {},
+      });
     }
   }
 
@@ -233,8 +248,26 @@ const handleAppointmentBooked = async (req, res) => {
         }
       );
       console.log(`lead created in ${customerLocation.serviceUsing}`, res.data);
+
+      if (res.data.success) {
+        // Log success
+        await ActivityLog.create({
+          user_id: customerLocation.user_id,
+          eventType: "Success",
+          message: `Lead created in ${customerLocation.serviceUsing} successfully`,
+          customData: res.data,
+        });
+      } else {
+        throw createCustomerRes.data;
+      }
     } catch (error) {
-      console.log(error.response);
+      console.log(error);
+      // Log failure
+      await ActivityLog.create({
+        eventType: "Failure",
+        message: `Error creating lead in ${customerLocation.serviceUsing}: ${error.message}`,
+        customData: error,
+      });
     }
   }
 
