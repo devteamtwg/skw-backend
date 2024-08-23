@@ -19,6 +19,11 @@ const handleCustomerCreation = async (req, res) => {
     serviceSubdomain: subdomain,
   });
 
+  if (!customerLocation) {
+    res.status(404).send("Location not found!");
+    return;
+  }
+
   const payload = {
     email: syncroCustomer.attributes.email,
     phone: syncroCustomer.attributes.phone,
@@ -92,6 +97,11 @@ const handleTicketStatusChanged = async (req, res) => {
   const customerLocation = await Locationhl.findOne({
     serviceSubdomain: subdomain,
   });
+
+  if (!customerLocation) {
+    res.status(404).send("Location not found!");
+    return;
+  }
 
   try {
     const highlevelCustomerRes = await axios.post(
@@ -167,6 +177,11 @@ const handleInvoicePaid = async (req, res) => {
   const customerLocation = await Locationhl.findOne({
     serviceSubdomain: subdomain,
   });
+
+  if (!customerLocation) {
+    res.status(404).send("Location not found!");
+    return;
+  }
 
   try {
     const highlevelCustomerRes = await axios.post(

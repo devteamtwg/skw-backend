@@ -60,6 +60,7 @@ const widgetRoutes = require("./routes/widgetRoutes");
 const estimateRoutes = require("./routes/estimateRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const activityRoutes = require("./routes/activity");
 
 app.use("/v1/", authRoutes);
 app.use("/v1/widgetspublic", publicRoutes);
@@ -85,3 +86,4 @@ app.use("/v1/widgets", requireAuth, widgetRoutes);
 app.use("/v1/estimates", requireAuth, estimateRoutes);
 app.use("/v1/reports", requireAuth, reportRoutes);
 app.use("/v1/dashboard", requireAuth, dashboardRoutes);
+app.use("/v1/activity", requireAuth, activityRoutes);

@@ -16,6 +16,11 @@ const handleCustomerCreation = async (req, res) => {
     hl_location_id: highlevelCustomer.location.id,
   });
 
+  if (!customerLocation) {
+    res.status(404).send("Location not found!");
+    return;
+  }
+
   // console.log("customerLocation", customerLocation)
 
   // Create customer in Syncro/RepairShopr
@@ -165,6 +170,11 @@ const handleAppointmentBooked = async (req, res) => {
   const customerLocation = await Locationhl.findOne({
     hl_location_id: bookedAppointment.location.id,
   });
+
+  if (!customerLocation) {
+    res.status(404).send("Location not found!");
+    return;
+  }
 
   const payload = {
     address: bookedAppointment.full_address,
