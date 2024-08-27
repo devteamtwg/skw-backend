@@ -109,7 +109,8 @@ const handleCustomerCreation = async (req, res) => {
 
   // Create customer in RepairDesk
   else if (customerLocation.serviceUsing == "RepairDesk") {
-    const formattedEmail = highlevelCustomer?.email?.replace("+", "");
+    const formattedEmail =
+      highlevelCustomer?.email?.replace("+", "") || highlevelCustomer.email;
     try {
       const findCustomerRes = await axios.get(
         `https://api.repairdesk.co/api/web/v1/customers?api_key=${customerLocation.serviceApiKey}&keyword=${formattedEmail}`

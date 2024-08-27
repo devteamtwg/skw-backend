@@ -42,6 +42,7 @@ const publicRoutes = require("./routes/publicRoutes");
 const highlevelRoutes = require("./routes/webhooks/highlevel");
 const syncroRoutes = require("./routes/webhooks/syncro");
 const repairshoprRoutes = require("./routes/webhooks/repairshopr");
+const repairDeskRoutes = require("./routes/webhooks/repairDesk");
 
 const userRoutes = require("./routes/userRoutes");
 const profileRoutes = require("./routes/profileRoutes");
@@ -68,6 +69,7 @@ app.use("/v1/widgetspublic", publicRoutes);
 app.use("/webhooks/highlevel", highlevelRoutes);
 app.use("/webhooks/syncro", syncroRoutes);
 app.use("/webhooks/repairshopr", repairshoprRoutes);
+app.use("/webhooks/repairDesk", repairDeskRoutes);
 
 app.use("/v1/users", requireAuth, userRoutes);
 app.use("/v1/profile", requireAuth, profileRoutes);

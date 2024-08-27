@@ -3,6 +3,8 @@ const mongoose = require("mongoose");
 const activitySchema = new mongoose.Schema(
   {
     user_id: String,
+    event: String,
+    businessName: String,
     eventType: {
       type: String,
       required: true,

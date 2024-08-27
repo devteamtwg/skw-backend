@@ -3,42 +3,33 @@ const Client = require("../../models/client");
 const { default: axios } = require("axios");
 const ActivityLog = require("../../models/activity");
 
-// Customer Created in Syncro
+// Customer Created in RepairDesk
 const handleCustomerCreation = async (req, res) => {
   const date = new Date();
   console.log(
-    `Customer Created in Syncro at ${date.toLocaleTimeString()}`,
+    `Customer Created in RepairDesk at ${date.toLocaleTimeString()}`,
     req.body
   );
 
-  const syncroCustomer = req.body;
+  const repairDeskCustomer = req.body;
 
-  const url = syncroCustomer.link;
-  const subdomain = url?.split(".")[0]?.replace("https://", "");
+  const url = repairDeskCustomer.link;
+  const subdomain = url.split(".")[0].replace("https://", "");
 
   const customerLocation = await Locationhl.findOne({
     serviceSubdomain: subdomain,
   });
-  
-  const client = await Client.findOne({
-    user_id: customerLocation.user_id,
-  });
-
-  if (!customerLocation) {
-    res.status(404).send("Location not found!");
-    return;
-  }
 
   const payload = {
-    email: syncroCustomer.attributes.email,
-    phone: syncroCustomer.attributes.phone,
-    firstName: syncroCustomer.attributes.firstname,
-    lastName: syncroCustomer.attributes.lastname,
-    name: syncroCustomer.attributes.fullname,
-    address1: syncroCustomer.attributes.address,
-    city: syncroCustomer.attributes.city,
-    state: syncroCustomer.attributes.state,
-    country: syncroCustomer.attributes.country,
+    email: repairDeskCustomer.attributes.email,
+    phone: repairDeskCustomer.attributes.phone,
+    firstName: repairDeskCustomer.attributes.firstname,
+    lastName: repairDeskCustomer.attributes.lastname,
+    name: repairDeskCustomer.attributes.fullname,
+    address1: repairDeskCustomer.attributes.address,
+    city: repairDeskCustomer.attributes.city,
+    state: repairDeskCustomer.attributes.state,
+    country: repairDeskCustomer.attributes.country,
     locationId: customerLocation.hl_location_id,
   };
 
@@ -48,7 +39,7 @@ const handleCustomerCreation = async (req, res) => {
     const duplicateCustomerRes = await axios.get(
       `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${
         customerLocation.hl_location_id
-      }&email=${encodeURIComponent(syncroCustomer.email)}`,
+      }&email=${encodeURIComponent(repairDesk.email)}`,
       {
         headers: {
           Authorization: `Bearer ${customerLocation.hl_access_token}`,
@@ -56,7 +47,7 @@ const handleCustomerCreation = async (req, res) => {
         },
       }
     );
-    console.log("duplicateCustomerRes", duplicateCustomerRes.data);
+    // console.log("duplicateCustomerRes", duplicateCustomerRes.data);
 
     if (duplicateCustomerRes.data.contact == null) {
       try {
@@ -70,16 +61,14 @@ const handleCustomerCreation = async (req, res) => {
             },
           }
         );
-        console.log(
-          "Syncro Customer Synced with Highlevel Successfully",
-          highlevelCustomerRes.data
-        );
+        // console.log("highlevelCustomerRes", highlevelCustomerRes.data);
+        console.log("RepairDesk Customer Synced with Highlevel Successfully");
 
         // Log success
         await ActivityLog.create({
           user_id: customerLocation.user_id,
           eventType: "Success",
-          message: `Syncro Customer Synced with Highlevel Successfully`,
+          message: `RepairDesk Customer Synced with Highlevel Successfully`,
           customData: highlevelCustomerRes.data,
         });
       } catch (error) {
@@ -89,7 +78,7 @@ const handleCustomerCreation = async (req, res) => {
         await ActivityLog.create({
           user_id: customerLocation.user_id,
           eventType: "Failure",
-          message: `Error syncing Syncro customer in Highlevel`,
+          message: `Error syncing RepairDesk customer in Highlevel`,
           customData: error.response ? error.response.data : error,
         });
       }
@@ -101,28 +90,23 @@ const handleCustomerCreation = async (req, res) => {
   res.status(200).send("Webhook received successfully");
 };
 
-// Ticket Status changed in Syncro
+// Ticket Status changed in RepairDesk
 const handleTicketStatusChanged = async (req, res) => {
-  // const date = new Date();
-  // console.log(
-  //   `Ticket Status Changed in Syncro at ${date.toLocaleTimeString()}`,
-  //   req.body
-  // );
+  const date = new Date();
+  console.log(
+    `Ticket Status Changed in RepairDesk at ${date.toLocaleTimeString()}`,
+    req.body
+  );
 
-  const syncroTicket = req.body;
-  const { customer, status } = syncroTicket.attributes;
+  const repairDeskTicket = req.body;
+  const { customer, status } = repairDeskTicket.attributes;
 
-  const url = syncroTicket.link;
-  const subdomain = url?.split(".")[0]?.replace("https://", "");
+  const url = repairDeskTicket.link;
+  const subdomain = url.split(".")[0].replace("https://", "");
 
   const customerLocation = await Locationhl.findOne({
     serviceSubdomain: subdomain,
   });
-
-  if (!customerLocation) {
-    res.status(404).send("Location not found!");
-    return;
-  }
 
   try {
     const highlevelCustomerRes = await axios.post(
@@ -166,8 +150,7 @@ const handleTicketStatusChanged = async (req, res) => {
           }
         );
         console.log(
-          `${status} Tag added in Highlevel's customer ${customer.email}`,
-          addTagRes.data
+          `${status} Tag added in Highlevel's customer ${customer.email}`
         );
 
         // Log success
@@ -205,28 +188,23 @@ const handleTicketStatusChanged = async (req, res) => {
   res.status(200).send("Webhook received successfully");
 };
 
-// Invoice is Paid in Syncro
+// Invoice is Paid in RepairDesk
 const handleInvoicePaid = async (req, res) => {
-  // const date = new Date();
-  // console.log(
-  //   `An Invoice is Paid in Syncro at ${date.toLocaleTimeString()}`,
-  //   req.body
-  // );
+  const date = new Date();
+  console.log(
+    `An Invoice is Paid in RepairDesk at ${date.toLocaleTimeString()}`,
+    req.body
+  );
 
-  const syncroInvoice = req.body;
-  const { customer, success } = syncroInvoice.attributes;
+  const repairDeskInvoice = req.body;
+  const { customer, success } = repairDeskInvoice.attributes;
 
-  const url = syncroInvoice.link;
-  const subdomain = url?.split(".")[0]?.replace("https://", "");
+  const url = repairDeskInvoice.link;
+  const subdomain = url.split(".")[0].replace("https://", "");
 
   const customerLocation = await Locationhl.findOne({
     serviceSubdomain: subdomain,
   });
-
-  if (!customerLocation) {
-    res.status(404).send("Location not found!");
-    return;
-  }
 
   try {
     const highlevelCustomerRes = await axios.post(
@@ -268,7 +246,6 @@ const handleInvoicePaid = async (req, res) => {
             },
           }
         );
-        // console.log(addTagRes.data);
         console.log(
           `${success && "Invoice Paid"} Tag added in Highlevel's customer ${
             customer.email
@@ -287,7 +264,6 @@ const handleInvoicePaid = async (req, res) => {
         });
       } catch (error) {
         console.error(error);
-
         // Log failure
         await ActivityLog.create({
           user_id: customerLocation.user_id,
@@ -299,7 +275,6 @@ const handleInvoicePaid = async (req, res) => {
     }
   } catch (error) {
     console.error(error.response);
-
     // Log failure
     await ActivityLog.create({
       user_id: customerLocation.user_id,
