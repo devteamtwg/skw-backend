@@ -9,7 +9,7 @@ const handleCustomerCreation = async (req, res) => {
   console.log(
     `Customer Created in RepairDesk at ${date.toLocaleTimeString()}`,
     req.body
-  );
+  )
 
   const repairDeskCustomer = req.body;
 
