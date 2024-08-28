@@ -1,13 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const {
-  handleCustomerCreation,
-  handleTicketStatusChanged,
-  handleInvoicePaid,
+  handleRepairDeskWebhook,
 } = require("../../controllers/webhooks/repairDesk");
 
-router.post("/customerCreated/sync", handleCustomerCreation);
-router.post("/ticketStatusChanged/sync", handleTicketStatusChanged);
-router.post("/invoicePaid/sync", handleInvoicePaid);
+router.post("/handleEvents", handleRepairDeskWebhook);
 
 module.exports = router;
