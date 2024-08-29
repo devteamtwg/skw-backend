@@ -16,18 +16,58 @@ const handleCustomerCreation = async (req, res) => {
   const url = syncroCustomer.link;
   const subdomain = url?.split(".")[0]?.replace("https://", "");
 
+  // Get Business Location
   const customerLocation = await Locationhl.findOne({
     serviceSubdomain: subdomain,
-  });
-  
-  const client = await Client.findOne({
-    user_id: customerLocation.user_id,
   });
 
   if (!customerLocation) {
     res.status(404).send("Location not found!");
     return;
   }
+
+  // Refresh Highlvel Access Token
+  let new_access_token;
+
+  const data = {
+    client_id: process.env.HL_CLIENT_ID,
+    client_secret: process.env.HL_CLIENT_SECRET,
+    grant_type: "refresh_token",
+    refresh_token: customerLocation.hl_refresh_token,
+    user_type: "Location",
+    redirect_uri: process.env.HL_REDIRECT_URL,
+  };
+
+  const queryString = new URLSearchParams(data).toString();
+
+  try {
+    const refreshTokenRes = await axios.post(
+      process.env.HL_TOKEN_URL + "/oauth/token",
+      queryString
+    );
+    // console.log("refreshTokenRes", refreshTokenRes.data);
+    new_access_token = refreshTokenRes.data.access_token;
+
+    // Update Access token in Database
+    await Locationhl.updateOne(
+      {
+        hl_location_id: refreshTokenRes.data.locationId,
+      },
+      {
+        $set: {
+          hl_access_token: refreshTokenRes.data.access_token,
+          hl_refresh_token: refreshTokenRes.data.refresh_token,
+        },
+      }
+    );
+  } catch (error) {
+    console.log(error);
+  }
+
+  // Get Business
+  const client = await Client.findOne({
+    user_id: customerLocation.user_id,
+  });
 
   const payload = {
     email: syncroCustomer.attributes.email,
@@ -51,7 +91,7 @@ const handleCustomerCreation = async (req, res) => {
       }&email=${encodeURIComponent(syncroCustomer.email)}`,
       {
         headers: {
-          Authorization: `Bearer ${customerLocation.hl_access_token}`,
+          Authorization: `Bearer ${new_access_token}`,
           Version: "2021-07-28",
         },
       }
@@ -65,7 +105,7 @@ const handleCustomerCreation = async (req, res) => {
           payload,
           {
             headers: {
-              Authorization: `Bearer ${customerLocation.hl_access_token}`,
+              Authorization: `Bearer ${new_access_token}`,
               Version: "2021-07-28",
             },
           }
@@ -103,11 +143,11 @@ const handleCustomerCreation = async (req, res) => {
 
 // Ticket Status changed in Syncro
 const handleTicketStatusChanged = async (req, res) => {
-  // const date = new Date();
-  // console.log(
-  //   `Ticket Status Changed in Syncro at ${date.toLocaleTimeString()}`,
-  //   req.body
-  // );
+  const date = new Date();
+  console.log(
+    `Ticket Status Changed in Syncro at ${date.toLocaleTimeString()}`,
+    req.body
+  );
 
   const syncroTicket = req.body;
   const { customer, status } = syncroTicket.attributes;
@@ -115,6 +155,7 @@ const handleTicketStatusChanged = async (req, res) => {
   const url = syncroTicket.link;
   const subdomain = url?.split(".")[0]?.replace("https://", "");
 
+  // Get Business Location
   const customerLocation = await Locationhl.findOne({
     serviceSubdomain: subdomain,
   });
@@ -122,6 +163,44 @@ const handleTicketStatusChanged = async (req, res) => {
   if (!customerLocation) {
     res.status(404).send("Location not found!");
     return;
+  }
+
+  // Refresh Highlvel Access Token
+  let new_access_token;
+
+  const data = {
+    client_id: process.env.HL_CLIENT_ID,
+    client_secret: process.env.HL_CLIENT_SECRET,
+    grant_type: "refresh_token",
+    refresh_token: customerLocation.hl_refresh_token,
+    user_type: "Location",
+    redirect_uri: process.env.HL_REDIRECT_URL,
+  };
+
+  const queryString = new URLSearchParams(data).toString();
+
+  try {
+    const refreshTokenRes = await axios.post(
+      process.env.HL_TOKEN_URL + "/oauth/token",
+      queryString
+    );
+    // console.log("refreshTokenRes", refreshTokenRes.data);
+    new_access_token = refreshTokenRes.data.access_token;
+
+    // Update Access token in Database
+    await Locationhl.updateOne(
+      {
+        hl_location_id: refreshTokenRes.data.locationId,
+      },
+      {
+        $set: {
+          hl_access_token: refreshTokenRes.data.access_token,
+          hl_refresh_token: refreshTokenRes.data.refresh_token,
+        },
+      }
+    );
+  } catch (error) {
+    console.log(error);
   }
 
   try {
@@ -141,7 +220,7 @@ const handleTicketStatusChanged = async (req, res) => {
       },
       {
         headers: {
-          Authorization: `Bearer ${customerLocation.hl_access_token}`,
+          Authorization: `Bearer ${new_access_token}`,
           Version: "2021-07-28",
         },
       }
@@ -160,7 +239,7 @@ const handleTicketStatusChanged = async (req, res) => {
           },
           {
             headers: {
-              Authorization: `Bearer ${customerLocation.hl_access_token}`,
+              Authorization: `Bearer ${new_access_token}`,
               Version: "2021-07-28",
             },
           }
@@ -219,6 +298,7 @@ const handleInvoicePaid = async (req, res) => {
   const url = syncroInvoice.link;
   const subdomain = url?.split(".")[0]?.replace("https://", "");
 
+  // Get Business Location
   const customerLocation = await Locationhl.findOne({
     serviceSubdomain: subdomain,
   });
@@ -226,6 +306,44 @@ const handleInvoicePaid = async (req, res) => {
   if (!customerLocation) {
     res.status(404).send("Location not found!");
     return;
+  }
+
+  // Refresh Highlvel Access Token
+  let new_access_token;
+
+  const data = {
+    client_id: process.env.HL_CLIENT_ID,
+    client_secret: process.env.HL_CLIENT_SECRET,
+    grant_type: "refresh_token",
+    refresh_token: customerLocation.hl_refresh_token,
+    user_type: "Location",
+    redirect_uri: process.env.HL_REDIRECT_URL,
+  };
+
+  const queryString = new URLSearchParams(data).toString();
+
+  try {
+    const refreshTokenRes = await axios.post(
+      process.env.HL_TOKEN_URL + "/oauth/token",
+      queryString
+    );
+    // console.log("refreshTokenRes", refreshTokenRes.data);
+    new_access_token = refreshTokenRes.data.access_token;
+
+    // Update Access token in Database
+    await Locationhl.updateOne(
+      {
+        hl_location_id: refreshTokenRes.data.locationId,
+      },
+      {
+        $set: {
+          hl_access_token: refreshTokenRes.data.access_token,
+          hl_refresh_token: refreshTokenRes.data.refresh_token,
+        },
+      }
+    );
+  } catch (error) {
+    console.log(error);
   }
 
   try {
@@ -245,7 +363,7 @@ const handleInvoicePaid = async (req, res) => {
       },
       {
         headers: {
-          Authorization: `Bearer ${customerLocation.hl_access_token}`,
+          Authorization: `Bearer ${new_access_token}`,
           Version: "2021-07-28",
         },
       }
@@ -263,7 +381,7 @@ const handleInvoicePaid = async (req, res) => {
           },
           {
             headers: {
-              Authorization: `Bearer ${customerLocation.hl_access_token}`,
+              Authorization: `Bearer ${new_access_token}`,
               Version: "2021-07-28",
             },
           }

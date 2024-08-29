@@ -37,6 +37,7 @@ const handleCustomerCreation = async (req, res, text) => {
   const subdomainMatch = text.match(/https:\/\/([^\.]+)\.repairdesk\.co/);
   const subdomain = subdomainMatch ? subdomainMatch[1] : null;
 
+  // Get Business Location
   const customerLocation = await Locationhl.findOne({
     serviceSubdomain: subdomain,
   });
@@ -44,6 +45,44 @@ const handleCustomerCreation = async (req, res, text) => {
   if (!customerLocation) {
     res.status(404).send("Location not found!");
     return;
+  }
+
+  // Refresh Highlvel Access Token
+  let new_access_token;
+
+  const data = {
+    client_id: process.env.HL_CLIENT_ID,
+    client_secret: process.env.HL_CLIENT_SECRET,
+    grant_type: "refresh_token",
+    refresh_token: customerLocation.hl_refresh_token,
+    user_type: "Location",
+    redirect_uri: process.env.HL_REDIRECT_URL,
+  };
+
+  const queryString = new URLSearchParams(data).toString();
+
+  try {
+    const refreshTokenRes = await axios.post(
+      process.env.HL_TOKEN_URL + "/oauth/token",
+      queryString
+    );
+    // console.log("refreshTokenRes", refreshTokenRes.data);
+    new_access_token = refreshTokenRes.data.access_token;
+
+    // Update Access token in Database
+    await Locationhl.updateOne(
+      {
+        hl_location_id: refreshTokenRes.data.locationId,
+      },
+      {
+        $set: {
+          hl_access_token: refreshTokenRes.data.access_token,
+          hl_refresh_token: refreshTokenRes.data.refresh_token,
+        },
+      }
+    );
+  } catch (error) {
+    console.log(error);
   }
 
   console.log(`Handling customer creation for ${customerId}`);
@@ -75,7 +114,7 @@ const handleCustomerCreation = async (req, res, text) => {
         }&email=${encodeURIComponent(payload.email)}`,
         {
           headers: {
-            Authorization: `Bearer ${customerLocation.hl_access_token}`,
+            Authorization: `Bearer ${new_access_token}`,
             Version: "2021-07-28",
           },
         }
@@ -89,7 +128,7 @@ const handleCustomerCreation = async (req, res, text) => {
             payload,
             {
               headers: {
-                Authorization: `Bearer ${customerLocation.hl_access_token}`,
+                Authorization: `Bearer ${new_access_token}`,
                 Version: "2021-07-28",
               },
             }
@@ -146,6 +185,44 @@ const handleTicketStatusChanged = async (req, res, text) => {
     return;
   }
 
+  // Refresh Highlvel Access Token
+  let new_access_token;
+
+  const data = {
+    client_id: process.env.HL_CLIENT_ID,
+    client_secret: process.env.HL_CLIENT_SECRET,
+    grant_type: "refresh_token",
+    refresh_token: customerLocation.hl_refresh_token,
+    user_type: "Location",
+    redirect_uri: process.env.HL_REDIRECT_URL,
+  };
+
+  const queryString = new URLSearchParams(data).toString();
+
+  try {
+    const refreshTokenRes = await axios.post(
+      process.env.HL_TOKEN_URL + "/oauth/token",
+      queryString
+    );
+    // console.log("refreshTokenRes", refreshTokenRes.data);
+    new_access_token = refreshTokenRes.data.access_token;
+
+    // Update Access token in Database
+    await Locationhl.updateOne(
+      {
+        hl_location_id: refreshTokenRes.data.locationId,
+      },
+      {
+        $set: {
+          hl_access_token: refreshTokenRes.data.access_token,
+          hl_refresh_token: refreshTokenRes.data.refresh_token,
+        },
+      }
+    );
+  } catch (error) {
+    console.log(error);
+  }
+
   try {
     const getTicketRes = await axios.get(
       `https://api.repairdesk.co/api/web/v1/tickets/${ticketId}?api_key=${customerLocation.serviceApiKey}`
@@ -173,7 +250,7 @@ const handleTicketStatusChanged = async (req, res, text) => {
       },
       {
         headers: {
-          Authorization: `Bearer ${customerLocation.hl_access_token}`,
+          Authorization: `Bearer ${new_access_token}`,
           Version: "2021-07-28",
         },
       }
@@ -192,7 +269,7 @@ const handleTicketStatusChanged = async (req, res, text) => {
           },
           {
             headers: {
-              Authorization: `Bearer ${customerLocation.hl_access_token}`,
+              Authorization: `Bearer ${new_access_token}`,
               Version: "2021-07-28",
             },
           }
@@ -250,6 +327,44 @@ const handleInvoicePaid = async (req, res, text) => {
     return;
   }
 
+  // Refresh Highlvel Access Token
+  let new_access_token;
+
+  const data = {
+    client_id: process.env.HL_CLIENT_ID,
+    client_secret: process.env.HL_CLIENT_SECRET,
+    grant_type: "refresh_token",
+    refresh_token: customerLocation.hl_refresh_token,
+    user_type: "Location",
+    redirect_uri: process.env.HL_REDIRECT_URL,
+  };
+
+  const queryString = new URLSearchParams(data).toString();
+
+  try {
+    const refreshTokenRes = await axios.post(
+      process.env.HL_TOKEN_URL + "/oauth/token",
+      queryString
+    );
+    // console.log("refreshTokenRes", refreshTokenRes.data);
+    new_access_token = refreshTokenRes.data.access_token;
+
+    // Update Access token in Database
+    await Locationhl.updateOne(
+      {
+        hl_location_id: refreshTokenRes.data.locationId,
+      },
+      {
+        $set: {
+          hl_access_token: refreshTokenRes.data.access_token,
+          hl_refresh_token: refreshTokenRes.data.refresh_token,
+        },
+      }
+    );
+  } catch (error) {
+    console.log(error);
+  }
+
   try {
     const getInvoiceRes = await axios.get(
       `https://api.repairdesk.co/api/web/v1/invoices/${invoiceId}?api_key=${customerLocation.serviceApiKey}`
@@ -279,7 +394,7 @@ const handleInvoicePaid = async (req, res, text) => {
         },
         {
           headers: {
-            Authorization: `Bearer ${customerLocation.hl_access_token}`,
+            Authorization: `Bearer ${new_access_token}`,
             Version: "2021-07-28",
           },
         }
@@ -298,7 +413,7 @@ const handleInvoicePaid = async (req, res, text) => {
             },
             {
               headers: {
-                Authorization: `Bearer ${customerLocation.hl_access_token}`,
+                Authorization: `Bearer ${new_access_token}`,
                 Version: "2021-07-28",
               },
             }
