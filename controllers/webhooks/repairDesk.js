@@ -14,6 +14,9 @@ const handleRepairDeskWebhook = async (req, res) => {
       case /Added New Customer/.test(text):
         await handleCustomerCreation(req, res, text);
         break;
+      case /Added new Ticket/.test(text):
+        await handleNewTicketAdded(req, res, text);
+        break;
       case /Updated ticket Status/.test(text):
         await handleTicketStatusChanged(req, res, text);
         break;
@@ -165,7 +168,148 @@ const handleCustomerCreation = async (req, res, text) => {
   }
 };
 
+const handleNewTicketAdded = async (req, res, text) => {
+  const ticketIdMatch = text.match(/ticket\/view&id=(\d+)/);
+  const ticketId = ticketIdMatch ? ticketIdMatch[1] : null;
+
+  const subdomainMatch = text.match(/https:\/\/([^\.]+)\.repairdesk\.co/);
+  const subdomain = subdomainMatch ? subdomainMatch[1] : null;
+
+  const customerLocation = await Locationhl.findOne({
+    serviceSubdomain: subdomain,
+  });
+
+  if (!customerLocation) {
+    res.status(404).send("Location not found!");
+    return;
+  }
+
+  // Refresh Highlvel Access Token
+  let new_access_token;
+
+  const data = {
+    client_id: process.env.HL_CLIENT_ID,
+    client_secret: process.env.HL_CLIENT_SECRET,
+    grant_type: "refresh_token",
+    refresh_token: customerLocation.hl_refresh_token,
+    user_type: "Location",
+    redirect_uri: process.env.HL_REDIRECT_URL,
+  };
+
+  const queryString = new URLSearchParams(data).toString();
+
+  try {
+    const refreshTokenRes = await axios.post(
+      process.env.HL_TOKEN_URL + "/oauth/token",
+      queryString
+    );
+    // console.log("refreshTokenRes", refreshTokenRes.data);
+    new_access_token = refreshTokenRes.data.access_token;
+
+    // Update Access token in Database
+    await Locationhl.updateOne(
+      {
+        hl_location_id: refreshTokenRes.data.locationId,
+      },
+      {
+        $set: {
+          hl_access_token: refreshTokenRes.data.access_token,
+          hl_refresh_token: refreshTokenRes.data.refresh_token,
+        },
+      }
+    );
+  } catch (error) {
+    console.log(error);
+  }
+
+  try {
+    const getTicketRes = await axios.get(
+      `https://api.repairdesk.co/api/web/v1/tickets/${ticketId}?api_key=${customerLocation.serviceApiKey}`
+    );
+    console.log("getTicketRes", getTicketRes.data.data);
+
+    const payload = {
+      email: getTicketRes.data.data.summary.customer.email,
+      phone:
+        getTicketRes.data.data.summary.customer.phone ||
+        getTicketRes.data.data.summary.customer.mobile,
+      firstName: getTicketRes.data.data.summary.customer.first_name,
+      lastName: getTicketRes.data.data.summary.customer.last_name,
+      name: getTicketRes.data.data.summary.customer.fullname,
+      address1: getTicketRes.data.data.summary.customer.address1,
+      city: getTicketRes.data.data.summary.customer.city,
+      state: getTicketRes.data.data.summary.customer.state,
+      country: getTicketRes.data.data.summary.customer.country || "US",
+      locationId: customerLocation.hl_location_id,
+    };
+
+    // Check if customer exists in Highlevel
+    const duplicateCustomerRes = await axios.get(
+      `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${
+        customerLocation.hl_location_id
+      }&email=${encodeURIComponent(payload.email)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${new_access_token}`,
+          Version: "2021-07-28",
+        },
+      }
+    );
+    console.log("duplicateCustomerRes", duplicateCustomerRes.data);
+
+    // Add a tag in Highlevel's Customer
+    if (duplicateCustomerRes.data.contact == null) {
+      try {
+        const highlevelCustomerRes = await axios.post(
+          "https://services.leadconnectorhq.com/contacts/",
+          payload,
+          {
+            headers: {
+              Authorization: `Bearer ${new_access_token}`,
+              Version: "2021-07-28",
+            },
+          }
+        );
+        console.log(
+          "RepairDesk Customer Synced with Highlevel Successfully",
+          highlevelCustomerRes.data
+        );
+
+        // Log success
+        await ActivityLog.create({
+          user_id: customerLocation.user_id,
+          eventType: "Success",
+          message: `RepairDesk Customer Synced with Highlevel Successfully`,
+          customData: highlevelCustomerRes.data,
+        });
+      } catch (error) {
+        console.error(error.response);
+
+        // Log failure
+        await ActivityLog.create({
+          user_id: customerLocation.user_id,
+          eventType: "Failure",
+          message: `Error syncing RepairDesk customer in Highlevel`,
+          customData: error.response ? error.response.data : error,
+        });
+      }
+    }
+  } catch (error) {
+    console.error(error.response.data);
+
+    // Log failure
+    await ActivityLog.create({
+      user_id: customerLocation.user_id,
+      eventType: "Failure",
+      message: `Error adding tag in Highlevel's Customer`,
+      customData: error.response ? error.response.data : error,
+    });
+  }
+};
+
 const handleTicketStatusChanged = async (req, res, text) => {
+  console.log("This is also running...!");
+
   const ticketIdMatch = text.match(/Ticket Id :.*<.+?id=(\d+)\|/);
   const ticketId = ticketIdMatch ? ticketIdMatch[1] : null;
 
@@ -305,7 +449,7 @@ const handleTicketStatusChanged = async (req, res, text) => {
     await ActivityLog.create({
       user_id: customerLocation.user_id,
       eventType: "Failure",
-      message: `Error adding tag in Highlevel's Customer ${getCustomerRes.email}`,
+      message: `Internal Server Error`,
       customData: error.response ? error.response.data : error,
     });
   }
