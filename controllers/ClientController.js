@@ -1,5 +1,7 @@
 const Location = require("../models/location");
 const Locationhl = require("../models/locationhl");
+const Client = require("../models/client");
+const User = require("../models/user");
 const { ObjectId } = require("mongodb");
 
 const client_all = (req, res) => {
