@@ -65,6 +65,7 @@ const activityRoutes = require("./routes/activity");
 
 app.use("/v1/", authRoutes);
 app.use("/v1/widgetspublic", publicRoutes);
+
 // Handle Webhooks
 app.use("/webhooks/highlevel", highlevelRoutes);
 app.use("/webhooks/syncro", syncroRoutes);

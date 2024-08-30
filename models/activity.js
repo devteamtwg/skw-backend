@@ -10,6 +10,7 @@ const activitySchema = new mongoose.Schema(
       required: true,
       enum: ["Success", "Failure"],
     },
+    platform: String,
     message: {
       type: String,
       required: true,
