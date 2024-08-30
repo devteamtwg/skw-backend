@@ -288,7 +288,9 @@ const handleNewTicketAdded = async (req, res, text) => {
           try {
             const addTagRes = await axios.post(
               `https://services.leadconnectorhq.com/contacts/${highlevelCustomerRes.data.contact.id}/tags`,
-              payload,
+              {
+                tags: [ticketStatus],
+              },
               {
                 headers: {
                   Authorization: `Bearer ${new_access_token}`,
