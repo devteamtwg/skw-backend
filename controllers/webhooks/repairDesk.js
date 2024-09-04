@@ -50,6 +50,10 @@ const handleCustomerCreation = async (req, res, text) => {
     return;
   }
 
+  const client = await Client.findOne({
+    user_id: customerLocation.user_id,
+  });
+  
   // Refresh Highlvel Access Token
   let new_access_token;
 
@@ -144,7 +148,10 @@ const handleCustomerCreation = async (req, res, text) => {
           // Log success
           await ActivityLog.create({
             user_id: customerLocation.user_id,
+            businessName: client.business_name,
             eventType: "Success",
+            event: "Ticket and Customer Created in RepairDesk",
+            platform: "RepairDesk",
             message: `RepairDesk Customer Synced with Highlevel Successfully`,
             customData: highlevelCustomerRes.data,
           });
@@ -158,6 +165,8 @@ const handleCustomerCreation = async (req, res, text) => {
             message: `Error syncing RepairDesk customer in Highlevel ${
               error.response ? error.response.data.message : ""
             }`,
+            event: "Ticket and Customer Created in RepairDesk",
+            platform: "RepairDesk",
             customData: error.response ? error.response.data : error,
           });
         }
@@ -181,14 +190,14 @@ const handleNewTicketAdded = async (req, res, text) => {
     serviceSubdomain: subdomain,
   });
 
-  const client = await Client.findOne({
-    user_id: customerLocation.user_id,
-  });
-
   if (!customerLocation) {
     res.status(404).send("Location not found!");
     return;
   }
+
+  const client = await Client.findOne({
+    user_id: customerLocation.user_id,
+  });
 
   // Refresh Highlvel Access Token
   let new_access_token;
@@ -311,7 +320,7 @@ const handleNewTicketAdded = async (req, res, text) => {
           user_id: customerLocation.user_id,
           businessName: client.business_name,
           eventType: "Success",
-          event: "Customer Created and tag added",
+          event: "Ticket and Customer Created in RepairDesk",
           platform: "RepairDesk",
           message: `RepairDesk Customer Synced with Highlevel Successfully and a tag is added ${ticketStatus}`,
           customData: highlevelCustomerRes.data,
@@ -322,8 +331,11 @@ const handleNewTicketAdded = async (req, res, text) => {
         // Log failure
         await ActivityLog.create({
           user_id: customerLocation.user_id,
+          businessName: client.business_name,
           eventType: "Failure",
           message: `Error syncing RepairDesk customer in Highlevel`,
+          event: "Ticket and Customer Created in RepairDesk",
+          platform: "RepairDesk",
           customData: error.response ? error.response.data : error,
         });
       }
@@ -336,6 +348,8 @@ const handleNewTicketAdded = async (req, res, text) => {
       user_id: customerLocation.user_id,
       eventType: "Failure",
       message: `Error adding tag in Highlevel's Customer`,
+      event: "Ticket and Customer Created in RepairDesk",
+      platform: "RepairDesk",
       customData: error.response ? error.response.data : error,
     });
   }

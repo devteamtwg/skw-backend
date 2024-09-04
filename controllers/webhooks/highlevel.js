@@ -109,11 +109,9 @@ const handleCustomerCreation = async (req, res) => {
 
   // Create customer in RepairDesk
   else if (customerLocation.serviceUsing == "RepairDesk") {
-    const formattedEmail =
-      highlevelCustomer?.email?.replace("+", "") || highlevelCustomer.email;
     try {
       const findCustomerRes = await axios.get(
-        `https://api.repairdesk.co/api/web/v1/customers?api_key=${customerLocation.serviceApiKey}&keyword=${formattedEmail}`
+        `https://api.repairdesk.co/api/web/v1/customers?api_key=${customerLocation.serviceApiKey}&keyword=${highlevelCustomer.email}`
       );
       // console.log("findCustomerRes", findCustomerRes.data.data.customerData);
       if (findCustomerRes.data.data.customerData.length === 0) {
@@ -127,19 +125,18 @@ const handleCustomerCreation = async (req, res) => {
             email: payload.email,
           }
         );
-        console.log(
-          "customer created in RepairDesk Successfully"
-          // createCustomerRes.data
-        );
-
         if (createCustomerRes.data.success) {
           // Log success
           await ActivityLog.create({
             user_id: customerLocation.user_id,
+            platform: "Highlevel",
+            event: "Customer created in Highlevel",
             eventType: "Success",
             message: `Customer synced with ${customerLocation.serviceUsing} successfully`,
             customData: createCustomerRes.data,
           });
+        } else if (createCustomerRes.data.statusCode == 409) {
+          return;
         } else {
           throw createCustomerRes.data;
         }
@@ -149,9 +146,12 @@ const handleCustomerCreation = async (req, res) => {
 
       // Log failure
       await ActivityLog.create({
+        user_id: customerLocation.user_id,
         eventType: "Failure",
         message: `Error creating customer in ${customerLocation.serviceUsing}: ${error.message}`,
         customData: error,
+        platform: "Highlevel",
+        event: "Customer created in Highlevel",
       });
     }
   }
