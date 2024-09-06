@@ -116,7 +116,7 @@ const handleCustomerCreation = async (req, res, text) => {
 
     const payload = {
       email: customerEmail,
-      phone: customerPhone?.replace(/\s+/g, ""),
+      phone: customerPhone?.replace(/[\s-]+/g, ""),
       firstName: getCustomerRes.data.data.first_name,
       lastName: getCustomerRes.data.data.last_name,
       name: getCustomerRes.data.data.fullname,
@@ -266,19 +266,19 @@ const handleNewTicketAdded = async (req, res, text) => {
 
     // Create Payload
     const customerEmail =
-      getTicketRes.data.data.summary.customer.email ||
-      getTicketRes.data.data.summary.customer.emails[0].value ||
+      getTicketRes?.data?.data?.summary?.customer?.email ||
+      getTicketRes?.data?.data?.summary?.customer?.emails[0]?.value ||
       null;
     const customerPhone =
-      getTicketRes.data.data.summary.customer.phone ||
-      getTicketRes.data.data.summary.customer.mobile ||
-      getTicketRes.data.data.summary.customer.phones[0].value ||
-      getTicketRes.data.data.summary.customer.mobiles[0].value ||
+      getTicketRes?.data?.data?.summary?.customer?.phone ||
+      getTicketRes?.data?.data?.summary?.customer?.mobile ||
+      getTicketRes?.data?.data?.summary?.customer?.phones[0]?.value ||
+      getTicketRes?.data?.data?.summary?.customer?.mobiles[0]?.value ||
       null;
 
     const payload = {
       email: customerEmail,
-      phone: customerPhone?.replace(/\s+/g, ""),
+      phone: customerPhone?.replace(/[\s-]+/g, ""),
       firstName: getTicketRes.data.data.summary.customer.first_name,
       lastName: getTicketRes.data.data.summary.customer.last_name,
       name: getTicketRes.data.data.summary.customer.fullname,
@@ -299,7 +299,7 @@ const handleNewTicketAdded = async (req, res, text) => {
       }${
         payload.email
           ? `&email=${encodeURIComponent(payload.email)}`
-          : `&number=${encodeURIComponent(payload.phone.replace(/\s+/g, ""))}`
+          : `&number=${encodeURIComponent(payload.phone)}`
       }`,
       {
         headers: {
@@ -497,14 +497,14 @@ const handleTicketStatusChanged = async (req, res, text) => {
     console.log("getTicketRes", getTicketRes.data.data);
 
     const customerEmail =
-      getTicketRes.data.data.summary.customer.email ||
-      getTicketRes.data.data.summary.customer.emails[0].value ||
+      getTicketRes?.data?.data?.summary?.customer?.email ||
+      getTicketRes?.data?.data?.summary?.customer?.emails[0]?.value ||
       null;
     const customerPhone =
-      getTicketRes.data.data.summary.customer.phone ||
-      getTicketRes.data.data.summary.customer.mobile ||
-      getTicketRes.data.data.summary.customer.phones[0].value ||
-      getTicketRes.data.data.summary.customer.mobiles[0].value ||
+      getTicketRes?.data?.data?.summary?.customer?.phone ||
+      getTicketRes?.data?.data?.summary?.customer?.mobile ||
+      getTicketRes?.data?.data?.summary?.customer?.phones[0]?.value ||
+      getTicketRes?.data?.data?.summary?.customer?.mobiles[0]?.value ||
       null;
 
     const highlevelCustomerRes = await axios.post(
@@ -523,7 +523,7 @@ const handleTicketStatusChanged = async (req, res, text) => {
             : {
                 field: "phone",
                 operator: "eq",
-                value: customerPhone?.replace(/\s+/g, ""),
+                value: customerPhone?.replace(/[\s-]+/g, ""),
               },
         ],
       },
@@ -534,7 +534,7 @@ const handleTicketStatusChanged = async (req, res, text) => {
         },
       }
     );
-    // console.log("highlevelCustomerRes", highlevelCustomerRes.data);
+    console.log("highlevelCustomerRes", highlevelCustomerRes.data);
 
     const searchedCustomers = highlevelCustomerRes.data.contacts;
 
@@ -664,14 +664,14 @@ const handleInvoicePaid = async (req, res, text) => {
     console.log("getInvoiceRes", getInvoiceRes.data.data);
 
     const customerEmail =
-      getInvoiceRes.data.data.summary.customer.email ||
-      getInvoiceRes.data.data.summary.customer.emails[0].value ||
+      getInvoiceRes?.data?.data?.summary?.customer?.email ||
+      getInvoiceRes?.data?.data?.summary?.customer?.emails[0]?.value ||
       null;
     const customerPhone =
-      getInvoiceRes.data.data.summary.customer.phone ||
-      getInvoiceRes.data.data.summary.customer.mobile ||
-      getInvoiceRes.data.data.summary.customer.phones[0].value ||
-      getInvoiceRes.data.data.summary.customer.mobiles[0].value ||
+      getInvoiceRes?.data?.data?.summary?.customer?.phone ||
+      getInvoiceRes?.data?.data?.summary?.customer?.mobile ||
+      getInvoiceRes?.data?.data?.summary?.customer?.phones[0]?.value ||
+      getInvoiceRes?.data?.data?.summary?.customer?.mobiles[0]?.value ||
       null;
 
     if (getInvoiceRes.data.data.summary.status.toLowerCase() == "paid") {
@@ -692,7 +692,7 @@ const handleInvoicePaid = async (req, res, text) => {
               : {
                   field: "phone",
                   operator: "eq",
-                  value: customerPhone?.replace(/\s+/g, ""),
+                  value: customerPhone?.replace(/[\s-]+/g, ""),
                 },
           ],
         },
