@@ -101,8 +101,16 @@ const handleCustomerCreation = async (req, res, text) => {
     );
     console.log("getCustomerRes", getCustomerRes.data.data);
     const payload = {
-      email: getCustomerRes.data.data.emails[0].value,
-      phone: getCustomerRes.data.data.phone || getCustomerRes.data.data.mobile,
+      email:
+        getCustomerRes?.data?.data?.email ||
+        getCustomerRes?.data?.data?.emails[0]?.value ||
+        null,
+      phone:
+        getCustomerRes?.data?.data?.phone ||
+        getCustomerRes?.data?.data?.mobile ||
+        getCustomerRes?.data?.data?.phones[0]?.value ||
+        getCustomerRes?.data?.data?.mobiles[0]?.value ||
+        null,
       firstName: getCustomerRes.data.data.first_name,
       lastName: getCustomerRes.data.data.last_name,
       name: getCustomerRes.data.data.fullname,
@@ -118,7 +126,11 @@ const handleCustomerCreation = async (req, res, text) => {
       const duplicateCustomerRes = await axios.get(
         `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${
           customerLocation.hl_location_id
-        }&email=${encodeURIComponent(payload.email)}`,
+        }${
+          payload.email
+            ? `&email=${encodeURIComponent(payload.email)}`
+            : `&number=${encodeURIComponent(payload.phone)}`
+        }`,
         {
           headers: {
             Authorization: `Bearer ${new_access_token}`,
@@ -150,7 +162,7 @@ const handleCustomerCreation = async (req, res, text) => {
             user_id: customerLocation.user_id,
             businessName: client.business_name,
             eventType: "Success",
-            event: "Ticket and Customer Created in RepairDesk",
+            event: "Customer Created in RepairDesk",
             platform: "RepairDesk",
             message: `RepairDesk Customer Synced with Highlevel Successfully`,
             customData: highlevelCustomerRes.data,
@@ -165,7 +177,7 @@ const handleCustomerCreation = async (req, res, text) => {
             message: `Error syncing RepairDesk customer in Highlevel ${
               error.response ? error.response.data.message : ""
             }`,
-            event: "Ticket and Customer Created in RepairDesk",
+            event: "Customer Created in RepairDesk",
             platform: "RepairDesk",
             customData: error.response ? error.response.data : error,
           });
@@ -246,6 +258,7 @@ const handleNewTicketAdded = async (req, res, text) => {
     // Extract first Ticket Status
     const ticketStatus = getTicketRes.data.data.devices[0].status.name;
 
+    // Create Payload
     const payload = {
       email:
         getTicketRes.data.data.summary.customer.email ||
@@ -266,23 +279,9 @@ const handleNewTicketAdded = async (req, res, text) => {
       locationId: customerLocation.hl_location_id,
     };
 
-    console.log("Phones array", getTicketRes.data.data.summary.customer.phones);
-    console.log(
-      "Mobiles array",
-      getTicketRes.data.data.summary.customer.mobiles
-    );
     console.log("payload", payload);
 
     // Check if customer exists in Highlevel
-    let hlApiUrl = `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${
-      customerLocation.hl_location_id
-    }${
-      payload.email
-        ? `&email=${encodeURIComponent(payload.email)}`
-        : `&number=${encodeURIComponent(payload.phone)}`
-    }`;
-
-    console.log("hlApiUrl", hlApiUrl);
 
     const duplicateCustomerRes = await axios.get(
       `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${
@@ -439,6 +438,10 @@ const handleTicketStatusChanged = async (req, res, text) => {
     return;
   }
 
+  const client = await Client.findOne({
+    user_id: customerLocation.user_id,
+  });
+
   // Refresh Highlvel Access Token
   let new_access_token;
 
@@ -483,10 +486,16 @@ const handleTicketStatusChanged = async (req, res, text) => {
     );
     console.log("getTicketRes", getTicketRes.data.data);
 
-    const getCustomerRes = await axios.get(
-      `https://api.repairdesk.co/api/web/v1/customers/${getTicketRes.data.data.summary.customer.cid}?api_key=${customerLocation.serviceApiKey}`
-    );
-    console.log("getCustomerRes", getCustomerRes.data.data);
+    const customerEmail =
+      getTicketRes.data.data.summary.customer.email ||
+      getTicketRes.data.data.summary.customer.emails[0].value ||
+      null;
+    const customerPhone =
+      getTicketRes.data.data.summary.customer.phone ||
+      getTicketRes.data.data.summary.customer.mobile ||
+      getTicketRes.data.data.summary.customer.phones[0].value ||
+      getTicketRes.data.data.summary.customer.mobiles[0].value ||
+      null;
 
     const highlevelCustomerRes = await axios.post(
       "https://services.leadconnectorhq.com/contacts/search",
@@ -495,11 +504,17 @@ const handleTicketStatusChanged = async (req, res, text) => {
         page: 1,
         pageLimit: 20,
         filters: [
-          {
-            field: "email",
-            operator: "eq",
-            value: getCustomerRes.data.data.emails[0].value,
-          },
+          customerEmail
+            ? {
+                field: "email",
+                operator: "eq",
+                value: customerEmail,
+              }
+            : {
+                field: "phone",
+                operator: "eq",
+                value: customerPhone?.replace(/\s+/g, ""),
+              },
         ],
       },
       {
@@ -529,15 +544,18 @@ const handleTicketStatusChanged = async (req, res, text) => {
           }
         );
         console.log(
-          `${statusTo} Tag added in Highlevel's customer ${getCustomerRes.data.data.emails[0].value}`,
+          `${statusTo} Tag added in Highlevel's customer ${customerEmail}`,
           addTagRes.data
         );
 
         // Log success
         await ActivityLog.create({
           user_id: customerLocation.user_id,
+          businessName: client.business_name,
           eventType: "Success",
-          message: `Tag added in Highlevel's customer ${getCustomerRes.data.data.emails[0].value}`,
+          event: "Ticket Status Changed in RepairDesk",
+          platform: "RepairDesk",
+          message: `${statusTo} Tag added in Highlevel's customer ${customerEmail}`,
           customData: addTagRes.data,
         });
       } catch (error) {
@@ -546,19 +564,25 @@ const handleTicketStatusChanged = async (req, res, text) => {
         // Log failure
         await ActivityLog.create({
           user_id: customerLocation.user_id,
+          businessName: client.business_name,
           eventType: "Failure",
-          message: `Error adding tag in Highlevel's Customer ${getCustomerRes.email}`,
+          event: "Ticket Status Changed in RepairDesk",
+          platform: "RepairDesk",
+          message: `Error adding tag in Highlevel's Customer ${customerEmail}`,
           customData: error.response ? error.response.data : error,
         });
       }
     }
   } catch (error) {
-    console.error(error.response);
+    console.error(error);
 
     // Log failure
     await ActivityLog.create({
       user_id: customerLocation.user_id,
+      businessName: client.business_name,
       eventType: "Failure",
+      event: "Ticket Status Changed in RepairDesk",
+      platform: "RepairDesk",
       message: `Internal Server Error`,
       customData: error.response ? error.response.data : error,
     });
@@ -580,6 +604,10 @@ const handleInvoicePaid = async (req, res, text) => {
     res.status(404).send("Location not found!");
     return;
   }
+
+  const client = await Client.findOne({
+    user_id: customerLocation.user_id,
+  });
 
   // Refresh Highlvel Access Token
   let new_access_token;
@@ -625,10 +653,16 @@ const handleInvoicePaid = async (req, res, text) => {
     );
     console.log("getInvoiceRes", getInvoiceRes.data.data);
 
-    const getCustomerRes = await axios.get(
-      `https://api.repairdesk.co/api/web/v1/customers/${getInvoiceRes.data.data.summary.customer.cid}?api_key=${customerLocation.serviceApiKey}`
-    );
-    console.log("getCustomerRes", getCustomerRes.data.data);
+    const customerEmail =
+      getInvoiceRes.data.data.summary.customer.email ||
+      getInvoiceRes.data.data.summary.customer.emails[0].value ||
+      null;
+    const customerPhone =
+      getInvoiceRes.data.data.summary.customer.phone ||
+      getInvoiceRes.data.data.summary.customer.mobile ||
+      getInvoiceRes.data.data.summary.customer.phones[0].value ||
+      getInvoiceRes.data.data.summary.customer.mobiles[0].value ||
+      null;
 
     if (getInvoiceRes.data.data.summary.status.toLowerCase() == "paid") {
       console.log("Inovice is paid now");
@@ -639,11 +673,17 @@ const handleInvoicePaid = async (req, res, text) => {
           page: 1,
           pageLimit: 20,
           filters: [
-            {
-              field: "email",
-              operator: "eq",
-              value: getCustomerRes.data.data.emails[0].value,
-            },
+            customerEmail
+              ? {
+                  field: "email",
+                  operator: "eq",
+                  value: customerEmail,
+                }
+              : {
+                  field: "phone",
+                  operator: "eq",
+                  value: customerPhone?.replace(/\s+/g, ""),
+                },
           ],
         },
         {
@@ -673,15 +713,18 @@ const handleInvoicePaid = async (req, res, text) => {
             }
           );
           console.log(
-            `Invoice Tag added in Highlevel's customer ${getCustomerRes.email}`,
+            `Invoice Paid Tag added in Highlevel's customer ${customerEmail}`,
             addTagRes.data
           );
 
           // Log success
           await ActivityLog.create({
             user_id: customerLocation.user_id,
+            businessName: client.business_name,
             eventType: "Success",
-            message: `Tag added in Highlevel's customer ${getCustomerRes.email}`,
+            event: "Invoice Paid in RepairDesk",
+            platform: "RepairDesk",
+            message: `Invoice Paid Tag added in Highlevel's customer ${customerEmail}`,
             customData: addTagRes.data,
           });
         } catch (error) {
@@ -690,8 +733,11 @@ const handleInvoicePaid = async (req, res, text) => {
           // Log failure
           await ActivityLog.create({
             user_id: customerLocation.user_id,
+            businessName: client.business_name,
             eventType: "Failure",
-            message: `Error adding tag in Highlevel's Customer ${getCustomerRes.email}`,
+            event: "Invoice Paid in RepairDesk",
+            platform: "RepairDesk",
+            message: `Error adding tag in Highlevel's Customer ${customerEmail}`,
             customData: error.response ? error.response.data : error,
           });
         }
@@ -699,18 +745,21 @@ const handleInvoicePaid = async (req, res, text) => {
     } else {
       console.log("Inovice is not paid yet");
     }
-    res.status(200).send("Webhook Recieved Successfully");
   } catch (error) {
     console.error(error.response);
 
     // Log failure
     await ActivityLog.create({
       user_id: customerLocation.user_id,
+      businessName: client.business_name,
       eventType: "Failure",
+      event: "Invoice Paid in RepairDesk",
+      platform: "RepairDesk",
       message: `Internal Server Error`,
       customData: error.response ? error.response.data : error,
     });
   }
+  res.status(200).send("Webhook Recieved Successfully");
 };
 
 module.exports = {
