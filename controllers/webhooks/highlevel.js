@@ -21,6 +21,10 @@ const handleCustomerCreation = async (req, res) => {
     return;
   }
 
+  const client = await Client.findOne({
+    user_id: customerLocation.user_id,
+  });
+  
   // console.log("customerLocation", customerLocation)
 
   // Create customer in Syncro/RepairShopr

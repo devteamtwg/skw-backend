@@ -100,17 +100,23 @@ const handleCustomerCreation = async (req, res, text) => {
       `https://api.repairdesk.co/api/web/v1/customers/${customerId}?api_key=${customerLocation.serviceApiKey}`
     );
     console.log("getCustomerRes", getCustomerRes.data.data);
+
+    // Create Payload
+    const customerEmail =
+      getCustomerRes?.data?.data?.email ||
+      getCustomerRes?.data?.data?.emails[0]?.value ||
+      null;
+
+    const customerPhone =
+      getCustomerRes?.data?.data?.phone ||
+      getCustomerRes?.data?.data?.mobile ||
+      getCustomerRes?.data?.data?.phones[0]?.value ||
+      getCustomerRes?.data?.data?.mobiles[0]?.value ||
+      null;
+
     const payload = {
-      email:
-        getCustomerRes?.data?.data?.email ||
-        getCustomerRes?.data?.data?.emails[0]?.value ||
-        null,
-      phone:
-        getCustomerRes?.data?.data?.phone ||
-        getCustomerRes?.data?.data?.mobile ||
-        getCustomerRes?.data?.data?.phones[0]?.value ||
-        getCustomerRes?.data?.data?.mobiles[0]?.value ||
-        null,
+      email: customerEmail,
+      phone: customerPhone?.replace(/\s+/g, ""),
       firstName: getCustomerRes.data.data.first_name,
       lastName: getCustomerRes.data.data.last_name,
       name: getCustomerRes.data.data.fullname,
@@ -259,16 +265,20 @@ const handleNewTicketAdded = async (req, res, text) => {
     const ticketStatus = getTicketRes.data.data.devices[0].status.name;
 
     // Create Payload
+    const customerEmail =
+      getTicketRes.data.data.summary.customer.email ||
+      getTicketRes.data.data.summary.customer.emails[0].value ||
+      null;
+    const customerPhone =
+      getTicketRes.data.data.summary.customer.phone ||
+      getTicketRes.data.data.summary.customer.mobile ||
+      getTicketRes.data.data.summary.customer.phones[0].value ||
+      getTicketRes.data.data.summary.customer.mobiles[0].value ||
+      null;
+
     const payload = {
-      email:
-        getTicketRes.data.data.summary.customer.email ||
-        getTicketRes.data.data.summary.customer.emails[0].value ||
-        null,
-      phone:
-        getTicketRes.data.data.summary.customer.phone ||
-        getTicketRes.data.data.summary.customer.mobile ||
-        getTicketRes.data.data.summary.customer.phones[0].value ||
-        getTicketRes.data.data.summary.customer.mobiles[0].value,
+      email: customerEmail,
+      phone: customerPhone?.replace(/\s+/g, ""),
       firstName: getTicketRes.data.data.summary.customer.first_name,
       lastName: getTicketRes.data.data.summary.customer.last_name,
       name: getTicketRes.data.data.summary.customer.fullname,
@@ -289,7 +299,7 @@ const handleNewTicketAdded = async (req, res, text) => {
       }${
         payload.email
           ? `&email=${encodeURIComponent(payload.email)}`
-          : `&number=${encodeURIComponent(payload.phone)}`
+          : `&number=${encodeURIComponent(payload.phone.replace(/\s+/g, ""))}`
       }`,
       {
         headers: {
