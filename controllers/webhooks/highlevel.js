@@ -24,7 +24,7 @@ const handleCustomerCreation = async (req, res) => {
   const client = await Client.findOne({
     user_id: customerLocation.user_id,
   });
-  
+
   // console.log("customerLocation", customerLocation)
 
   // Create customer in Syncro/RepairShopr
@@ -111,14 +111,65 @@ const handleCustomerCreation = async (req, res) => {
     }
   }
 
-  // Create customer in RepairDesk
+  // If service is RepairDesk
   else if (customerLocation.serviceUsing == "RepairDesk") {
+    // Check if customer already exists in RepairDesk
     try {
-      const findCustomerRes = await axios.get(
-        `https://api.repairdesk.co/api/web/v1/customers?api_key=${customerLocation.serviceApiKey}&keyword=${highlevelCustomer.email}`
-      );
-      // console.log("findCustomerRes", findCustomerRes.data.data.customerData);
-      if (findCustomerRes.data.data.customerData.length === 0) {
+      let findCustomerRes =
+        highlevelCustomer.email &&
+        (await axios.get(
+          `https://api.repairdesk.co/api/web/v1/customers?api_key=${customerLocation.serviceApiKey}&keyword=${highlevelCustomer.email}`
+        ));
+
+      if (
+        findCustomerRes == undefined ||
+        findCustomerRes.data.data.customerData.length === 0
+      ) {
+        if (highlevelCustomer.phone) {
+          await axios.get(
+            `https://api.repairdesk.co/api/web/v1/customers?api_key=${
+              customerLocation.serviceApiKey
+            }&keyword=${highlevelCustomer.phone || highlevelCustomer.mobile}`
+          );
+        }
+      }
+
+      console.log("findCustomerRes", findCustomerRes.data.data.customerData);
+
+      if (findCustomerRes.data.data.customerData[0]) {
+        const updateCustomerRes = await axios.put(
+          `https://api.repairdesk.co/api/web/v1/customers/${findCustomerRes.data.data.customerData[0].cid}?api_key=${customerLocation.serviceApiKey}`,
+          {
+            first_name: payload.firstname,
+            last_name: payload.lastname,
+            phone: payload.phone,
+            address1: payload.address,
+            email: payload.email,
+          }
+        );
+
+        console.log(
+          `Existing Customer updated in ${customerLocation.serviceUsing} successfully`,
+          updateCustomerRes.data
+        );
+
+        if (updateCustomerRes.data.success) {
+          // Log success
+          await ActivityLog.create({
+            user_id: customerLocation.user_id,
+            businessName: client.business_name,
+            platform: "Highlevel",
+            event: "Customer created in Highlevel",
+            eventType: "Success",
+            message: `Existing Customer <b>${updateCustomerRes.data.data.email}</b> updated in ${customerLocation.serviceUsing} successfully`,
+            customData: updateCustomerRes.data,
+          });
+        } else if (updateCustomerRes.data.statusCode == 409) {
+          return;
+        } else {
+          throw updateCustomerRes.data;
+        }
+      } else {
         const createCustomerRes = await axios.post(
           `https://api.repairdesk.co/api/web/v1/customers?api_key=${customerLocation.serviceApiKey}`,
           {
@@ -129,14 +180,21 @@ const handleCustomerCreation = async (req, res) => {
             email: payload.email,
           }
         );
+
+        console.log(
+          `Customer synced with ${customerLocation.serviceUsing} successfully`,
+          createCustomerRes.data
+        );
+
         if (createCustomerRes.data.success) {
           // Log success
           await ActivityLog.create({
             user_id: customerLocation.user_id,
+            businessName: client.business_name,
             platform: "Highlevel",
             event: "Customer created in Highlevel",
             eventType: "Success",
-            message: `Customer synced with ${customerLocation.serviceUsing} successfully`,
+            message: `Customer <b>${createCustomerRes.data.data.email}</b> synced with ${customerLocation.serviceUsing} successfully`,
             customData: createCustomerRes.data,
           });
         } else if (createCustomerRes.data.statusCode == 409) {
@@ -151,9 +209,10 @@ const handleCustomerCreation = async (req, res) => {
       // Log failure
       await ActivityLog.create({
         user_id: customerLocation.user_id,
+        businessName: client.business_name,
         eventType: "Failure",
-        message: `Error creating customer in ${customerLocation.serviceUsing}: ${error.message}`,
-        customData: error,
+        message: `Error syncing customer in ${customerLocation.serviceUsing}: ${error.message}`,
+        customData: error.response ? error.response.data : error,
         platform: "Highlevel",
         event: "Customer created in Highlevel",
       });
