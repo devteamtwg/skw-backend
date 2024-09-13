@@ -129,24 +129,92 @@ const handleCustomerCreation = async (req, res, text) => {
 
     try {
       // Check if customer exists in Highlevel
-      const duplicateCustomerRes = await axios.get(
-        `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${
-          customerLocation.hl_location_id
-        }${
-          payload.email
-            ? `&email=${encodeURIComponent(payload.email)}`
-            : `&number=${encodeURIComponent(payload.phone)}`
-        }`,
-        {
-          headers: {
-            Authorization: `Bearer ${new_access_token}`,
-            Version: "2021-07-28",
-          },
+      let duplicateCustomerRes =
+        payload.email &&
+        (await axios.get(
+          `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${
+            customerLocation.hl_location_id
+          }${`&email=${encodeURIComponent(payload.email)}`}`,
+          {
+            headers: {
+              Authorization: `Bearer ${new_access_token}`,
+              Version: "2021-07-28",
+            },
+          }
+        ));
+
+      // If no customer is found by email, check by phone
+      if (
+        duplicateCustomerRes == undefined ||
+        duplicateCustomerRes.data.contact == null
+      ) {
+        if (payload.phone) {
+          duplicateCustomerRes = await axios.get(
+            `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${
+              customerLocation.hl_location_id
+            }&number=${encodeURIComponent(payload.phone)}`,
+            {
+              headers: {
+                Authorization: `Bearer ${new_access_token}`,
+                Version: "2021-07-28",
+              },
+            }
+          );
         }
-      );
+      }
+
       console.log("duplicateCustomerRes", duplicateCustomerRes.data);
 
-      if (duplicateCustomerRes.data.contact == null) {
+      // If customer exists, Update it
+      if (duplicateCustomerRes.data.contact != null) {
+        delete payload.locationId;
+        try {
+          const updateHighlevelCustomerRes = await axios.put(
+            `https://services.leadconnectorhq.com/contacts/${duplicateCustomerRes.data.contact.id}`,
+            payload,
+            {
+              headers: {
+                Authorization: `Bearer ${new_access_token}`,
+                Version: "2021-07-28",
+              },
+            }
+          );
+          console.log(
+            "RepairDesk Customer Synced with Existing Highlevel Successfully",
+            updateHighlevelCustomerRes.data
+          );
+
+          // Log success
+          await ActivityLog.create({
+            user_id: customerLocation.user_id,
+            businessName: client.business_name,
+            eventType: "Success",
+            event: "Customer Created in RepairDesk",
+            platform: "RepairDesk",
+            message: `Customer <b>${
+              payload.email || payload.phone
+            }</b> Synced with Existing Highlevel Customer Successfully`,
+            customData: updateHighlevelCustomerRes.data,
+          });
+        } catch (error) {
+          console.error(error.response);
+
+          // Log failure
+          await ActivityLog.create({
+            user_id: customerLocation.user_id,
+            businessName: client.business_name,
+            eventType: "Failure",
+            message: `Error syncing RepairDesk customer with Existing Highlevel Customer ${
+              error.response ? error.response.data.message : ""
+            }`,
+            event: "Customer Created in RepairDesk",
+            platform: "RepairDesk",
+            customData: error.response ? error.response.data : error,
+          });
+        }
+      }
+      // If not exists, Create one
+      else {
         try {
           const highlevelCustomerRes = await axios.post(
             "https://services.leadconnectorhq.com/contacts/",
@@ -170,7 +238,9 @@ const handleCustomerCreation = async (req, res, text) => {
             eventType: "Success",
             event: "Customer Created in RepairDesk",
             platform: "RepairDesk",
-            message: `RepairDesk Customer Synced with Highlevel Successfully`,
+            message: `Customer <b>${
+              payload.email || payload.phone
+            }</b> Synced with Highlevel Successfully`,
             customData: highlevelCustomerRes.data,
           });
         } catch (error) {
@@ -179,50 +249,9 @@ const handleCustomerCreation = async (req, res, text) => {
           // Log failure
           await ActivityLog.create({
             user_id: customerLocation.user_id,
+            businessName: client.business_name,
             eventType: "Failure",
             message: `Error syncing RepairDesk customer in Highlevel ${
-              error.response ? error.response.data.message : ""
-            }`,
-            event: "Customer Created in RepairDesk",
-            platform: "RepairDesk",
-            customData: error.response ? error.response.data : error,
-          });
-        }
-      } else {
-        try {
-          const updateHighlevelCustomerRes = await axios.put(
-            `https://services.leadconnectorhq.com/contacts/${duplicateCustomerRes.data.contact.id}`,
-            payload,
-            {
-              headers: {
-                Authorization: `Bearer ${new_access_token}`,
-                Version: "2021-07-28",
-              },
-            }
-          );
-          console.log(
-            "RepairDesk Customer Synced with Highlevel Successfully",
-            updateHighlevelCustomerRes.data
-          );
-
-          // Log success
-          await ActivityLog.create({
-            user_id: customerLocation.user_id,
-            businessName: client.business_name,
-            eventType: "Success",
-            event: "Customer Created in RepairDesk",
-            platform: "RepairDesk",
-            message: `RepairDesk Customer Synced with Existing Highlevel Customer Successfully`,
-            customData: updateHighlevelCustomerRes.data,
-          });
-        } catch (error) {
-          console.error(error.response);
-
-          // Log failure
-          await ActivityLog.create({
-            user_id: customerLocation.user_id,
-            eventType: "Failure",
-            message: `Error syncing RepairDesk customer with Existing Highlevel Customer ${
               error.response ? error.response.data.message : ""
             }`,
             event: "Customer Created in RepairDesk",
@@ -236,6 +265,19 @@ const handleCustomerCreation = async (req, res, text) => {
     }
   } catch (error) {
     console.error(error);
+
+    // Log Failure for General Error
+    await ActivityLog.create({
+      user_id: customerLocation.user_id,
+      businessName: client.business_name,
+      eventType: "Failure",
+      message: error.response
+        ? error.response.data.message
+        : `Something went wrong! Maybe it is due to recieving incomplete request from RepairDesk`,
+      event: "Customer Created in RepairDesk",
+      platform: "RepairDesk",
+      customData: error.response ? error.response.data : error,
+    });
   }
 };
 
@@ -404,7 +446,9 @@ const handleNewTicketAdded = async (req, res, text) => {
           );
 
           console.log(
-            `Existing Customer ${updateHighlevelCustomerRes.data.contact.email || updateHighlevelCustomerRes.data.contact.phone} Updated in Highlevel and a Tag ${ticketStatus} is added Successfully`
+            `Existing Customer ${
+              payload.email || payload.phone
+            } Updated in Highlevel and a Tag ${ticketStatus} is added Successfully`
           );
 
           // Log Success
@@ -414,7 +458,9 @@ const handleNewTicketAdded = async (req, res, text) => {
             eventType: "Success",
             event: "Ticket and Customer Created in RepairDesk",
             platform: "RepairDesk",
-            message: `Existing Customer ${updateHighlevelCustomerRes.data.contact.email || updateHighlevelCustomerRes.data.contact.phone} Updated in Highlevel and a Tag ${ticketStatus} is added Successfully`,
+            message: `Existing Customer <b>${
+              payload.email || payload.phone
+            }</b> Updated in Highlevel and a Tag ${ticketStatus} is added Successfully`,
             customData: {
               customerUpdate: updateHighlevelCustomerRes.data,
               tagAdded: addTagRes.data,
@@ -431,10 +477,13 @@ const handleNewTicketAdded = async (req, res, text) => {
           // Log Failure for Tag
           await ActivityLog.create({
             user_id: customerLocation.user_id,
+            businessName: client.business_name,
             eventType: "Failure",
             event: "Ticket and Customer Created in RepairDesk",
             platform: "RepairDesk",
-            message: `Error adding tag in Existing Highlevel's customer ${duplicateCustomerRes.data.contact.email}: ${errorMessage}`,
+            message: `Error adding tag in Existing Highlevel's customer <b>${
+              payload.email || payload.phone
+            }</b>: ${errorMessage}`,
             customData: tagError.response ? tagError.response.data : tagError,
           });
         }
@@ -452,10 +501,13 @@ const handleNewTicketAdded = async (req, res, text) => {
         // Log Failure for Customer Update
         await ActivityLog.create({
           user_id: customerLocation.user_id,
+          businessName: client.business_name,
           eventType: "Failure",
           event: "Ticket and Customer Created in RepairDesk",
           platform: "RepairDesk",
-          message: `Error Updating Existing Customer in Highlevel ${duplicateCustomerRes.data.contact.email}: ${errorMessage}`,
+          message: `Error Updating Existing Customer in Highlevel <b>${
+            payload.email || payload.phone
+          }</b>: ${errorMessage}`,
           customData: customerUpdateError.response
             ? customerUpdateError.response.data
             : customerUpdateError,
@@ -492,7 +544,9 @@ const handleNewTicketAdded = async (req, res, text) => {
           eventType: "Success",
           event: "Ticket and Customer Created in RepairDesk",
           platform: "RepairDesk",
-          message: `${payload.email} Synced in Highlevel and a Tag ${ticketStatus} is added Successfully`,
+          message: `<b>${
+            payload.email || payload.phone
+          }</b> Synced in Highlevel and a Tag ${ticketStatus} is added Successfully`,
           customData: highlevelCustomerRes.data,
         });
       } catch (error) {
@@ -506,10 +560,11 @@ const handleNewTicketAdded = async (req, res, text) => {
         // Log Failure for Customer Creation
         await ActivityLog.create({
           user_id: customerLocation.user_id,
+          businessName: client.business_name,
           eventType: "Failure",
           event: "Ticket and Customer Created in RepairDesk",
           platform: "RepairDesk",
-          message: `Error creating new customer in Highlevel: ${errorMessage}`,
+          message: `Error syncing customer in Highlevel: ${errorMessage}`,
           customData: error.response ? error.response.data : error,
         });
       }
@@ -520,10 +575,11 @@ const handleNewTicketAdded = async (req, res, text) => {
     // Log Failure for General Error
     await ActivityLog.create({
       user_id: customerLocation.user_id,
+      businessName: client.business_name,
       eventType: "Failure",
       message: error.response
         ? error.response.data.message
-        : `Internal Server Error`,
+        : `Something went wrong! Maybe it is due to recieving incomplete request from RepairDesk`,
       event: "Ticket and Customer Created in RepairDesk",
       platform: "RepairDesk",
       customData: error.response ? error.response.data : error,
@@ -657,7 +713,9 @@ const handleTicketStatusChanged = async (req, res, text) => {
           }
         );
         console.log(
-          `${statusTo} Tag added in Highlevel's customer ${customerEmail}`,
+          `${statusTo} Tag added in Highlevel's customer <b>${
+            customerEmail || customerPhone
+          }</b>`,
           addTagRes.data
         );
 
@@ -668,7 +726,9 @@ const handleTicketStatusChanged = async (req, res, text) => {
           eventType: "Success",
           event: "Ticket Status Changed in RepairDesk",
           platform: "RepairDesk",
-          message: `${statusTo} Tag added in Highlevel's customer ${customerEmail}`,
+          message: `${statusTo} Tag added in Highlevel's customer <b>${
+            customerEmail || customerPhone
+          }</b>`,
           customData: addTagRes.data,
         });
       } catch (error) {
@@ -681,7 +741,9 @@ const handleTicketStatusChanged = async (req, res, text) => {
           eventType: "Failure",
           event: "Ticket Status Changed in RepairDesk",
           platform: "RepairDesk",
-          message: `Error adding tag in Highlevel's Customer ${customerEmail}`,
+          message: `Error adding tag in Highlevel's Customer <b>${
+            customerEmail || customerPhone
+          }</b>`,
           customData: error.response ? error.response.data : error,
         });
       }
@@ -689,14 +751,16 @@ const handleTicketStatusChanged = async (req, res, text) => {
   } catch (error) {
     console.error(error);
 
-    // Log failure
+    // Log Failure for General Error
     await ActivityLog.create({
       user_id: customerLocation.user_id,
       businessName: client.business_name,
       eventType: "Failure",
+      message: error.response
+        ? error.response.data.message
+        : `Something went wrong! Maybe it is due to recieving incomplete request from RepairDesk`,
       event: "Ticket Status Changed in RepairDesk",
       platform: "RepairDesk",
-      message: `Internal Server Error`,
       customData: error.response ? error.response.data : error,
     });
   }
@@ -837,7 +901,9 @@ const handleInvoicePaid = async (req, res, text) => {
             eventType: "Success",
             event: "Invoice Paid in RepairDesk",
             platform: "RepairDesk",
-            message: `Invoice Paid Tag added in Highlevel's customer ${customerEmail}`,
+            message: `Invoice Paid Tag added in Highlevel's customer <b>${
+              customerEmail || customerPhone
+            }</b>`,
             customData: addTagRes.data,
           });
         } catch (error) {
@@ -850,7 +916,9 @@ const handleInvoicePaid = async (req, res, text) => {
             eventType: "Failure",
             event: "Invoice Paid in RepairDesk",
             platform: "RepairDesk",
-            message: `Error adding tag in Highlevel's Customer ${customerEmail}`,
+            message: `Error adding tag in Highlevel's Customer <b>${
+              customerEmail || customerPhone
+            }</b>`,
             customData: error.response ? error.response.data : error,
           });
         }
@@ -861,14 +929,16 @@ const handleInvoicePaid = async (req, res, text) => {
   } catch (error) {
     console.error(error.response);
 
-    // Log failure
+    // Log Failure for General Error
     await ActivityLog.create({
       user_id: customerLocation.user_id,
       businessName: client.business_name,
       eventType: "Failure",
+      message: error.response
+        ? error.response.data.message
+        : `Something went wrong! Maybe it is due to recieving incomplete request from RepairDesk`,
       event: "Invoice Paid in RepairDesk",
       platform: "RepairDesk",
-      message: `Internal Server Error`,
       customData: error.response ? error.response.data : error,
     });
   }

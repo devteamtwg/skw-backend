@@ -121,6 +121,8 @@ const handleCustomerCreation = async (req, res) => {
           `https://api.repairdesk.co/api/web/v1/customers?api_key=${customerLocation.serviceApiKey}&keyword=${highlevelCustomer.email}`
         ));
 
+      console.log("findCustomerRes", findCustomerRes);
+
       if (
         findCustomerRes == undefined ||
         findCustomerRes.data.data.customerData.length === 0
