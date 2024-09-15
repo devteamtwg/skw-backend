@@ -121,8 +121,6 @@ const handleCustomerCreation = async (req, res) => {
           `https://api.repairdesk.co/api/web/v1/customers?api_key=${customerLocation.serviceApiKey}&keyword=${highlevelCustomer.email}`
         ));
 
-      console.log("findCustomerRes", findCustomerRes);
-
       if (
         findCustomerRes == undefined ||
         findCustomerRes.data.data.customerData.length === 0
@@ -138,7 +136,10 @@ const handleCustomerCreation = async (req, res) => {
 
       console.log("findCustomerRes", findCustomerRes.data.data.customerData);
 
-      if (findCustomerRes.data.data.customerData[0]) {
+      if (
+        findCustomerRes &&
+        findCustomerRes.data.data.customerData.length > 0
+      ) {
         const updateCustomerRes = await axios.put(
           `https://api.repairdesk.co/api/web/v1/customers/${findCustomerRes.data.data.customerData[0].cid}?api_key=${customerLocation.serviceApiKey}`,
           {
