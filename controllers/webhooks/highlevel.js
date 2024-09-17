@@ -123,10 +123,10 @@ const handleCustomerCreation = async (req, res) => {
 
       if (
         findCustomerRes == undefined ||
-        findCustomerRes.data.data.customerData.length === 0
+        findCustomerRes?.data?.data?.customerData?.length == 0
       ) {
-        if (highlevelCustomer.phone) {
-          await axios.get(
+        if (highlevelCustomer.phone || highlevelCustomer.mobile) {
+          findCustomerRes = await axios.get(
             `https://api.repairdesk.co/api/web/v1/customers?api_key=${
               customerLocation.serviceApiKey
             }&keyword=${highlevelCustomer.phone || highlevelCustomer.mobile}`
@@ -134,10 +134,11 @@ const handleCustomerCreation = async (req, res) => {
         }
       }
 
-      console.log("findCustomerRes", findCustomerRes.data.data.customerData);
+      console.log("findCustomerRes", findCustomerRes?.data?.data);
 
       if (
         findCustomerRes &&
+        findCustomerRes.data.data &&
         findCustomerRes.data.data.customerData.length > 0
       ) {
         const updateCustomerRes = await axios.put(
@@ -164,7 +165,11 @@ const handleCustomerCreation = async (req, res) => {
             platform: "Highlevel",
             event: "Customer created in Highlevel",
             eventType: "Success",
-            message: `Existing Customer <b>${updateCustomerRes.data.data.email}</b> updated in ${customerLocation.serviceUsing} successfully`,
+            message: `Existing Customer <b>${
+              updateCustomerRes.data.data.email ||
+              updateCustomerRes.data.data.phone ||
+              updateCustomerRes.data.data.mobile
+            }</b> updated in ${customerLocation.serviceUsing} successfully`,
             customData: updateCustomerRes.data,
           });
         } else if (updateCustomerRes.data.statusCode == 409) {
@@ -172,7 +177,9 @@ const handleCustomerCreation = async (req, res) => {
         } else {
           throw updateCustomerRes.data;
         }
-      } else {
+      } 
+      // Create customer if not exists
+      else {
         const createCustomerRes = await axios.post(
           `https://api.repairdesk.co/api/web/v1/customers?api_key=${customerLocation.serviceApiKey}`,
           {
@@ -197,7 +204,11 @@ const handleCustomerCreation = async (req, res) => {
             platform: "Highlevel",
             event: "Customer created in Highlevel",
             eventType: "Success",
-            message: `Customer <b>${createCustomerRes.data.data.email}</b> synced with ${customerLocation.serviceUsing} successfully`,
+            message: `Customer <b>${
+              createCustomerRes.data.data.email ||
+              createCustomerRes.data.data.phone ||
+              createCustomerRes.data.data.mobile
+            }</b> synced with ${customerLocation.serviceUsing} successfully`,
             customData: createCustomerRes.data,
           });
         } else if (createCustomerRes.data.statusCode == 409) {
