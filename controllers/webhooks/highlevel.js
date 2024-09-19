@@ -5,6 +5,7 @@ const ActivityLog = require("../../models/activity");
 
 // Customer Created in Highlevel
 const handleCustomerCreation = async (req, res) => {
+  console.log("/////*******************************************/////");
   // const date = new Date();
   // console.log(
   //   `Customer Created in Highlevel at ${date.toLocaleTimeString()}`,
@@ -233,6 +234,7 @@ const handleCustomerCreation = async (req, res) => {
     }
   }
   res.status(200).send("Webhook received successfully");
+  console.log("/////*******************************************/////");
 };
 
 // Appointment Booked in Highlevel

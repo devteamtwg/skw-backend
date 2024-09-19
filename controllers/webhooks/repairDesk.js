@@ -34,6 +34,8 @@ const handleRepairDeskWebhook = async (req, res) => {
 };
 
 const handleCustomerCreation = async (req, res, text) => {
+  console.log("/////*******************************************/////");
+  
   const customerIdMatch = text.match(/id=(\d+)\|/);
   const customerId = customerIdMatch ? customerIdMatch[1] : null;
 
@@ -279,9 +281,12 @@ const handleCustomerCreation = async (req, res, text) => {
       customData: error.response ? error.response.data : error,
     });
   }
+  console.log("/////*******************************************/////");
 };
 
 const handleNewTicketAdded = async (req, res, text) => {
+  console.log("/////*******************************************/////");
+
   const ticketIdMatch = text.match(/ticket\/view&id=(\d+)/);
   const ticketId = ticketIdMatch ? ticketIdMatch[1] : null;
 
@@ -585,9 +590,12 @@ const handleNewTicketAdded = async (req, res, text) => {
       customData: error.response ? error.response.data : error,
     });
   }
+  console.log("/////*******************************************/////");
 };
 
 const handleTicketStatusChanged = async (req, res, text) => {
+  console.log("/////*******************************************/////");
+
   const ticketIdMatch = text.match(/Ticket Id :.*<.+?id=(\d+)\|/);
   const ticketId = ticketIdMatch ? ticketIdMatch[1] : null;
 
@@ -764,9 +772,11 @@ const handleTicketStatusChanged = async (req, res, text) => {
       customData: error.response ? error.response.data : error,
     });
   }
+  console.log("/////*******************************************/////");
 };
 
 const handleInvoicePaid = async (req, res, text) => {
+  console.log("/////*******************************************/////");
   const invoiceIdMatch = text.match(/id=(\d+)\|/);
   const invoiceId = invoiceIdMatch ? invoiceIdMatch[1] : null;
 
@@ -943,6 +953,8 @@ const handleInvoicePaid = async (req, res, text) => {
     });
   }
   res.status(200).send("Webhook Recieved Successfully");
+
+  console.log("/////*******************************************/////");
 };
 
 module.exports = {
