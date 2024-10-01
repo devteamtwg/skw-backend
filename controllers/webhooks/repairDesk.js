@@ -7,7 +7,8 @@ const ActivityLog = require("../../models/activity");
 const handleRepairDeskWebhook = async (req, res) => {
   const date = new Date();
   const text = req.body.text;
-  console.log(`Webhook received at ${date.toLocaleTimeString()}`, text);
+  console.log(`Webhook received at ${date.toLocaleTimeString()}`);
+  console.log(`Body:`, req.body);
 
   try {
     switch (true) {
@@ -23,6 +24,9 @@ const handleRepairDeskWebhook = async (req, res) => {
       case /Updated Invoice/.test(text):
         await handleInvoicePaid(req, res, text);
         break;
+      case /Payment added in invoice/.test(text):
+        await handlePaymentAdded(req, res, text);
+        break;
       default:
         console.log("Unhandled event type");
         res.status(200).send("Unhandled event type");
@@ -33,9 +37,10 @@ const handleRepairDeskWebhook = async (req, res) => {
   }
 };
 
+// Customer Created (RepairDesk)
 const handleCustomerCreation = async (req, res, text) => {
   console.log("/////*******************************************/////");
-  
+
   const customerIdMatch = text.match(/id=(\d+)\|/);
   const customerId = customerIdMatch ? customerIdMatch[1] : null;
 
@@ -284,6 +289,7 @@ const handleCustomerCreation = async (req, res, text) => {
   console.log("/////*******************************************/////");
 };
 
+// Ticket Added (RepairDesk)
 const handleNewTicketAdded = async (req, res, text) => {
   console.log("/////*******************************************/////");
 
@@ -593,6 +599,7 @@ const handleNewTicketAdded = async (req, res, text) => {
   console.log("/////*******************************************/////");
 };
 
+// Ticket Status Changed (RepairDesk)
 const handleTicketStatusChanged = async (req, res, text) => {
   console.log("/////*******************************************/////");
 
@@ -775,6 +782,7 @@ const handleTicketStatusChanged = async (req, res, text) => {
   console.log("/////*******************************************/////");
 };
 
+// Invoice Paid (RepairDesk)
 const handleInvoicePaid = async (req, res, text) => {
   console.log("/////*******************************************/////");
   const invoiceIdMatch = text.match(/id=(\d+)\|/);
@@ -912,6 +920,201 @@ const handleInvoicePaid = async (req, res, text) => {
             event: "Invoice Paid in RepairDesk",
             platform: "RepairDesk",
             message: `Invoice Paid Tag added in Highlevel's customer <b>${
+              customerEmail || customerPhone
+            }</b>`,
+            customData: addTagRes.data,
+          });
+        } catch (error) {
+          console.error(error);
+
+          // Log failure
+          await ActivityLog.create({
+            user_id: customerLocation.user_id,
+            businessName: client.business_name,
+            eventType: "Failure",
+            event: "Invoice Paid in RepairDesk",
+            platform: "RepairDesk",
+            message: `Error adding tag in Highlevel's Customer <b>${
+              customerEmail || customerPhone
+            }</b>`,
+            customData: error.response ? error.response.data : error,
+          });
+        }
+      }
+    } else {
+      console.log("Inovice is not paid yet");
+    }
+  } catch (error) {
+    console.error(error.response);
+
+    // Log Failure for General Error
+    await ActivityLog.create({
+      user_id: customerLocation.user_id,
+      businessName: client.business_name,
+      eventType: "Failure",
+      message: error.response
+        ? error.response.data.message
+        : `Something went wrong! Maybe it is due to recieving incomplete request from RepairDesk`,
+      event: "Invoice Paid in RepairDesk",
+      platform: "RepairDesk",
+      customData: error.response ? error.response.data : error,
+    });
+  }
+  res.status(200).send("Webhook Recieved Successfully");
+
+  console.log("/////*******************************************/////");
+};
+
+// Payment Added in invoice (RepairDesk)
+const handlePaymentAdded = async (req, res, text) => {
+  console.log("/////*******************************************/////");
+  const invoiceIdMatch = text.match(/id=(\d+)\|/);
+  const invoiceId = invoiceIdMatch ? invoiceIdMatch[1] : null;
+
+  const subdomainMatch = text.match(/https:\/\/([^\.]+)\.repairdesk\.co/);
+  const subdomain = subdomainMatch ? subdomainMatch[1] : null;
+
+  const customerLocation = await Locationhl.findOne({
+    serviceSubdomain: subdomain,
+  });
+
+  if (!customerLocation) {
+    res.status(404).send("Location not found!");
+    return;
+  }
+
+  const client = await Client.findOne({
+    user_id: customerLocation.user_id,
+  });
+
+  // Refresh Highlvel Access Token
+  let new_access_token;
+
+  const data = {
+    client_id: process.env.HL_CLIENT_ID,
+    client_secret: process.env.HL_CLIENT_SECRET,
+    grant_type: "refresh_token",
+    refresh_token: customerLocation.hl_refresh_token,
+    user_type: "Location",
+    redirect_uri: process.env.HL_REDIRECT_URL,
+  };
+
+  const queryString = new URLSearchParams(data).toString();
+
+  try {
+    const refreshTokenRes = await axios.post(
+      process.env.HL_TOKEN_URL + "/oauth/token",
+      queryString
+    );
+    // console.log("refreshTokenRes", refreshTokenRes.data);
+    new_access_token = refreshTokenRes.data.access_token;
+
+    // Update Access token in Database
+    await Locationhl.updateOne(
+      {
+        hl_location_id: refreshTokenRes.data.locationId,
+      },
+      {
+        $set: {
+          hl_access_token: refreshTokenRes.data.access_token,
+          hl_refresh_token: refreshTokenRes.data.refresh_token,
+        },
+      }
+    );
+  } catch (error) {
+    console.log(error);
+  }
+
+  try {
+    const getInvoiceRes = await axios.get(
+      `https://api.repairdesk.co/api/web/v1/invoices/${invoiceId}?api_key=${customerLocation.serviceApiKey}`
+    );
+    console.log("getInvoiceRes", getInvoiceRes.data.data);
+
+    // Get Ticket by ID
+    const getTicketRes = await axios.get(
+      `https://api.repairdesk.co/api/web/v1/tickets/${getInvoiceRes.data.data.summary.ticket.id}?api_key=${customerLocation.serviceApiKey}`
+    );
+    console.log("getTicketRes", getTicketRes.data.data);
+
+    const ticketStatus = getTicketRes.data.data.devices[0].status.name;
+    const customerEmail =
+      getInvoiceRes?.data?.data?.summary?.customer?.email ||
+      getInvoiceRes?.data?.data?.summary?.customer?.emails[0]?.value ||
+      null;
+    const customerPhone =
+      getInvoiceRes?.data?.data?.summary?.customer?.phone ||
+      getInvoiceRes?.data?.data?.summary?.customer?.mobile ||
+      getInvoiceRes?.data?.data?.summary?.customer?.phones[0]?.value ||
+      getInvoiceRes?.data?.data?.summary?.customer?.mobiles[0]?.value ||
+      null;
+
+    if (getInvoiceRes.data.data.summary.status.toLowerCase() == "paid") {
+      console.log("Inovice is paid now");
+      const highlevelCustomerRes = await axios.post(
+        "https://services.leadconnectorhq.com/contacts/search",
+        {
+          locationId: customerLocation.hl_location_id,
+          page: 1,
+          pageLimit: 20,
+          filters: [
+            customerEmail
+              ? {
+                  field: "email",
+                  operator: "eq",
+                  value: customerEmail,
+                }
+              : {
+                  field: "phone",
+                  operator: "eq",
+                  value: customerPhone?.replace(/[\s-]+/g, ""),
+                },
+          ],
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${new_access_token}`,
+            Version: "2021-07-28",
+          },
+        }
+      );
+      console.log("highlevelCustomerRes", highlevelCustomerRes.data);
+
+      const searchedCustomers = highlevelCustomerRes.data.contacts;
+
+      // Add a tag in Highlevel's Customer
+      if (searchedCustomers.length > 0) {
+        try {
+          const addTagRes = await axios.post(
+            `https://services.leadconnectorhq.com/contacts/${searchedCustomers[0].id}/tags`,
+            {
+              tags:
+                ticketStatus == "Repaired & Collected" ? ["Invoice Paid", ticketStatus] : ["Invoice Paid"],
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${new_access_token}`,
+                Version: "2021-07-28",
+              },
+            }
+          );
+          console.log(
+            `Invoice Paid Tag added in Highlevel's customer ${customerEmail}`,
+            addTagRes.data
+          );
+
+          // Log success
+          await ActivityLog.create({
+            user_id: customerLocation.user_id,
+            businessName: client.business_name,
+            eventType: "Success",
+            event: "Invoice Paid in RepairDesk",
+            platform: "RepairDesk",
+            message: `${
+              ticketStatus == "Repaired & Collected"
+                ? `(Invoice Paid, ${ticketStatus}) Tags`
+                : "Invoice Paid Tag"
+            } added in Highlevel's customer <b>${
               customerEmail || customerPhone
             }</b>`,
             customData: addTagRes.data,

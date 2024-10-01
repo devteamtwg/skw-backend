@@ -178,7 +178,7 @@ const handleCustomerCreation = async (req, res) => {
         } else {
           throw updateCustomerRes.data;
         }
-      } 
+      }
       // Create customer if not exists
       else {
         const createCustomerRes = await axios.post(
@@ -239,6 +239,7 @@ const handleCustomerCreation = async (req, res) => {
 
 // Appointment Booked in Highlevel
 const handleAppointmentBooked = async (req, res) => {
+  console.log("/////*******************************************/////");
   const date = new Date();
   console.log(
     `Appointment Booked in Highlevel at ${date.toLocaleTimeString()}:`,
@@ -256,6 +257,10 @@ const handleAppointmentBooked = async (req, res) => {
     return;
   }
 
+  const client = await Client.findOne({
+    user_id: customerLocation.user_id,
+  });
+
   const payload = {
     address: bookedAppointment.full_address,
     // business_name: "",
@@ -263,95 +268,118 @@ const handleAppointmentBooked = async (req, res) => {
     first_name: bookedAppointment.first_name,
     last_name: bookedAppointment.last_name,
     phone: bookedAppointment.phone,
+    // status: bookedAppointment.calendar.status, // Lead Status In Service
     appointment_type_id: 0,
   };
 
-  if (
-    customerLocation.serviceUsing == "Syncro" ||
-    customerLocation.serviceUsing == "RepairShopr"
-  ) {
+  if (bookedAppointment?.calendar?.status?.toLowerCase() == "booked") {
     // Create Lead in Syncro/RepairShopr
-    try {
-      const res = await axios.post(
-        `https://${customerLocation.serviceSubdomain}.${
-          customerLocation.serviceUsing == "Syncro"
-            ? "syncromsp"
-            : "repairshopr"
-        }.com/api/v1/leads`,
-        payload,
-        {
-          headers: {
-            Authorization: customerLocation.serviceApiKey,
-          },
-        }
-      );
-      console.log(`lead created in ${customerLocation.serviceUsing}`, res.data);
+    if (
+      customerLocation.serviceUsing == "Syncro" ||
+      customerLocation.serviceUsing == "RepairShopr"
+    ) {
+      try {
+        const res = await axios.post(
+          `https://${customerLocation.serviceSubdomain}.${
+            customerLocation.serviceUsing == "Syncro"
+              ? "syncromsp"
+              : "repairshopr"
+          }.com/api/v1/leads`,
+          payload,
+          {
+            headers: {
+              Authorization: customerLocation.serviceApiKey,
+            },
+          }
+        );
+        console.log(
+          `lead created in ${customerLocation.serviceUsing}`,
+          res.data
+        );
 
-      // Log success
-      await ActivityLog.create({
-        user_id: customerLocation.user_id,
-        eventType: "Success",
-        message: `Lead created in ${customerLocation.serviceUsing} successfully`,
-        customData: res.data,
-      });
-    } catch (error) {
-      console.log(error.response);
-      // Log failure
-      await ActivityLog.create({
-        user_id: customerLocation.user_id,
-        eventType: "Failure",
-        message: `Error creating lead in ${customerLocation.serviceUsing}: ${error.response.data.message}`,
-        customData: error.response ? error.response.data : {},
-      });
-    }
-  }
-
-  // Create lead in RepairDesk
-  else if (customerLocation.serviceUsing == "RepairDesk") {
-    try {
-      const res = await axios.post(
-        `https://api.repairdesk.co/api/web/v1/appointment/create?api_key=${customerLocation.serviceApiKey}`,
-        {
-          summary: {
-            firstName: payload.first_name,
-            lastName: payload.last_name,
-            email: payload.email,
-            mobile: payload.phone,
-            address: payload.address,
-          },
-          devices: [],
-        },
-        {
-          headers: {
-            Authorization: customerLocation.serviceApiKey,
-          },
-        }
-      );
-      console.log(`lead created in ${customerLocation.serviceUsing}`, res.data);
-
-      if (res.data.success) {
         // Log success
         await ActivityLog.create({
           user_id: customerLocation.user_id,
+          businessName: client.business_name,
+          platform: "Highlevel",
+          event: "Appointment Booked in Highlevel",
           eventType: "Success",
           message: `Lead created in ${customerLocation.serviceUsing} successfully`,
           customData: res.data,
         });
-      } else {
-        throw createCustomerRes.data;
+      } catch (error) {
+        console.log(error.response);
+        // Log failure
+        await ActivityLog.create({
+          user_id: customerLocation.user_id,
+          businessName: client.business_name,
+          platform: "Highlevel",
+          event: "Appointment Booked in Highlevel",
+          eventType: "Failure",
+          message: `Error creating lead in ${customerLocation.serviceUsing}: ${error.response.data.message}`,
+          customData: error.response ? error.response.data : error,
+        });
       }
-    } catch (error) {
-      console.log(error);
-      // Log failure
-      await ActivityLog.create({
-        eventType: "Failure",
-        message: `Error creating lead in ${customerLocation.serviceUsing}: ${error.message}`,
-        customData: error,
-      });
+    }
+
+    // Create lead in RepairDesk
+    else if (customerLocation.serviceUsing == "RepairDesk") {
+      try {
+        const res = await axios.post(
+          `https://api.repairdesk.co/api/web/v1/appointment/create?api_key=${customerLocation.serviceApiKey}`,
+          {
+            summary: {
+              firstName: payload.first_name,
+              lastName: payload.last_name,
+              email: payload.email,
+              mobile: payload.phone,
+              address: payload.address,
+            },
+            devices: [],
+          },
+          {
+            headers: {
+              Authorization: customerLocation.serviceApiKey,
+            },
+          }
+        );
+        console.log(
+          `lead created in ${customerLocation.serviceUsing}`,
+          res.data
+        );
+
+        if (res.data.success) {
+          // Log success
+          await ActivityLog.create({
+            user_id: customerLocation.user_id,
+            businessName: client.business_name,
+            platform: "Highlevel",
+            event: "Appointment Booked in Highlevel",
+            eventType: "Success",
+            message: `Lead created in ${customerLocation.serviceUsing} successfully`,
+            customData: res.data,
+          });
+        } else {
+          throw res.data;
+        }
+      } catch (error) {
+        console.log(error);
+        // Log failure
+        await ActivityLog.create({
+          user_id: customerLocation.user_id,
+          businessName: client.business_name,
+          platform: "Highlevel",
+          event: "Appointment Booked in Highlevel",
+          eventType: "Failure",
+          message: `Error creating lead in ${customerLocation.serviceUsing}: ${error.response.data.message}`,
+          customData: error.response ? error.response.data : error,
+        });
+      }
     }
   }
 
   res.status(200).send("Webhook received successfully");
+  console.log("/////*******************************************/////");
 };
 
 module.exports = {
