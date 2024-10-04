@@ -30,14 +30,12 @@ const handleCustomerCreation = async (req, res) => {
 
   // Create customer in Syncro/RepairShopr
   const payload = {
-    business_name: "",
+    // business_name: "",
     firstname: highlevelCustomer.first_name,
     lastname: highlevelCustomer.last_name,
-    email: highlevelCustomer.email,
-    phone: highlevelCustomer.phone,
-    mobile: highlevelCustomer.mobile
-      ? highlevelCustomer.mobile
-      : highlevelCustomer.phone,
+    email: highlevelCustomer.email || null,
+    phone: highlevelCustomer.phone || null,
+    mobile: highlevelCustomer.mobile || null,
     address: highlevelCustomer.full_address,
     // city: "string",
     // state: "string",
@@ -57,14 +55,16 @@ const handleCustomerCreation = async (req, res) => {
           customerLocation.serviceUsing == "Syncro"
             ? "syncromsp"
             : "repairshopr"
-        }.com/api/v1/customers/autocomplete?query=${highlevelCustomer.email}`,
+        }.com/api/v1/customers/autocomplete?query=${
+          payload.email || payload.phone || payload.mobile
+        }`,
         {
           headers: {
             Authorization: customerLocation.serviceApiKey,
           },
         }
       );
-      console.log("duplicateCustomerRes", duplicateCustomerRes.data.customers);
+      // console.log("duplicateCustomerRes", duplicateCustomerRes.data.customers);
 
       if (duplicateCustomerRes.data.customers.length == 0) {
         try {
@@ -88,8 +88,15 @@ const handleCustomerCreation = async (req, res) => {
           // Log success
           await ActivityLog.create({
             user_id: customerLocation.user_id,
+            businessName: client.business_name,
+            platform: "Highlevel",
+            event: "Customer created in Highlevel",
             eventType: "Success",
-            message: `Customer synced with ${customerLocation.serviceUsing} successfully`,
+            message: `Existing Customer <b>${
+              res?.data?.data?.email ||
+              res?.data?.data?.phone ||
+              res?.data?.data?.mobile
+            }</b> updated in ${customerLocation.serviceUsing} successfully`,
             customData: res.data,
           });
         } catch (error) {
@@ -101,6 +108,9 @@ const handleCustomerCreation = async (req, res) => {
           // Log failure
           await ActivityLog.create({
             user_id: customerLocation.user_id,
+            businessName: client.business_name,
+            platform: "Highlevel",
+            event: "Customer created in Highlevel",
             eventType: "Failure",
             message: `Error creating customer in ${customerLocation.serviceUsing}: ${error.message}`,
             customData: error.response ? error.response.data : {},
@@ -167,9 +177,9 @@ const handleCustomerCreation = async (req, res) => {
             event: "Customer created in Highlevel",
             eventType: "Success",
             message: `Existing Customer <b>${
-              updateCustomerRes.data.data.email ||
-              updateCustomerRes.data.data.phone ||
-              updateCustomerRes.data.data.mobile
+              updateCustomerRes?.data?.data?.email ||
+              updateCustomerRes?.data?.data?.phone ||
+              updateCustomerRes?.data?.data?.mobile
             }</b> updated in ${customerLocation.serviceUsing} successfully`,
             customData: updateCustomerRes.data,
           });
@@ -206,9 +216,9 @@ const handleCustomerCreation = async (req, res) => {
             event: "Customer created in Highlevel",
             eventType: "Success",
             message: `Customer <b>${
-              createCustomerRes.data.data.email ||
-              createCustomerRes.data.data.phone ||
-              createCustomerRes.data.data.mobile
+              createCustomerRes?.data?.data?.email ||
+              createCustomerRes?.data?.data?.phone ||
+              createCustomerRes?.data?.data?.mobile
             }</b> synced with ${customerLocation.serviceUsing} successfully`,
             customData: createCustomerRes.data,
           });

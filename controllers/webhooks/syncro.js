@@ -84,13 +84,19 @@ const handleCustomerCreation = async (req, res) => {
 
   // console.log("payload", payload);
 
+  const phoneNumber = payload.phone?.replace(/[\s-]+/g, "");
+  const formattedPhoneNumber =
+    phoneNumber && !phoneNumber.startsWith("+")
+      ? `+1${phoneNumber}` // Add country code if missing
+      : phoneNumber;
+
   try {
     let duplicateCustomerRes =
       payload.email &&
       (await axios.get(
         `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${
           customerLocation.hl_location_id
-        }&email=${encodeURIComponent(syncroCustomer.email)}`,
+        }&email=${encodeURIComponent(payload.email)}`,
         {
           headers: {
             Authorization: `Bearer ${new_access_token}`,
@@ -108,7 +114,7 @@ const handleCustomerCreation = async (req, res) => {
         duplicateCustomerRes = await axios.get(
           `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${
             customerLocation.hl_location_id
-          }&number=${encodeURIComponent(payload.phone)}`,
+          }&number=${encodeURIComponent(formattedPhoneNumber)}`,
           {
             headers: {
               Authorization: `Bearer ${new_access_token}`,
@@ -221,6 +227,205 @@ const handleCustomerCreation = async (req, res) => {
   console.log("/////*******************************************/////");
 };
 
+// Ticket Created in Syncro
+const handleTicketCreated = async (req, res) => {
+  console.log("/////*******************************************/////");
+  const date = new Date();
+  console.log(
+    `Ticket Created in Syncro at ${date.toLocaleTimeString()}`,
+    req.body
+  );
+
+  const syncroTicket = req.body;
+  const { customer, status } = syncroTicket.attributes;
+
+  const url = syncroTicket.link;
+  const subdomain = url?.split(".")[0]?.replace("https://", "");
+
+  // Get Business Location
+  const customerLocation = await Locationhl.findOne({
+    serviceSubdomain: subdomain,
+  });
+
+  if (!customerLocation) {
+    res.status(404).send("Location not found!");
+    return;
+  }
+
+  const client = await Client.findOne({
+    user_id: customerLocation.user_id,
+  });
+
+  // Refresh Highlvel Access Token
+  let new_access_token;
+
+  const data = {
+    client_id: process.env.HL_CLIENT_ID,
+    client_secret: process.env.HL_CLIENT_SECRET,
+    grant_type: "refresh_token",
+    refresh_token: customerLocation.hl_refresh_token,
+    user_type: "Location",
+    redirect_uri: process.env.HL_REDIRECT_URL,
+  };
+
+  const queryString = new URLSearchParams(data).toString();
+
+  try {
+    const refreshTokenRes = await axios.post(
+      process.env.HL_TOKEN_URL + "/oauth/token",
+      queryString
+    );
+    // console.log("refreshTokenRes", refreshTokenRes.data);
+    new_access_token = refreshTokenRes.data.access_token;
+
+    // Update Access token in Database
+    await Locationhl.updateOne(
+      {
+        hl_location_id: refreshTokenRes.data.locationId,
+      },
+      {
+        $set: {
+          hl_access_token: refreshTokenRes.data.access_token,
+          hl_refresh_token: refreshTokenRes.data.refresh_token,
+        },
+      }
+    );
+  } catch (error) {
+    console.log(error);
+  }
+
+  let maxAttempts = 3;
+  let retryDelay = 1500;
+
+  const findCustomerAndTagThem = async () => {
+    try {
+      const phoneNumber =
+        customer?.phone?.replace(/[\s-]+/g, "") ||
+        customer?.mobile?.replace(/[\s-]+/g, "");
+      const formattedPhoneNumber =
+        phoneNumber && !phoneNumber.startsWith("+")
+          ? `+1${phoneNumber}` // Add country code if missing
+          : phoneNumber;
+
+      const highlevelCustomerRes = await axios.post(
+        "https://services.leadconnectorhq.com/contacts/search",
+        {
+          locationId: customerLocation.hl_location_id,
+          page: 1,
+          pageLimit: 20,
+          filters: [
+            customer.email
+              ? {
+                  field: "email",
+                  operator: "eq",
+                  value: customer.email,
+                }
+              : {
+                  field: "phone",
+                  operator: "eq",
+                  value: formattedPhoneNumber || "",
+                },
+          ],
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${new_access_token}`,
+            Version: "2021-07-28",
+          },
+        }
+      );
+      console.log("highlevelCustomerRes", highlevelCustomerRes.data);
+
+      const searchedCustomers = highlevelCustomerRes.data.contacts;
+
+      // Add a tag in HighLevel's Customer
+      if (searchedCustomers.length > 0) {
+        try {
+          const addTagRes = await axios.post(
+            `https://services.leadconnectorhq.com/contacts/${searchedCustomers[0].id}/tags`,
+            {
+              tags: [status],
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${new_access_token}`,
+                Version: "2021-07-28",
+              },
+            }
+          );
+          console.log(
+            `${status} Tag added in HighLevel's customer ${
+              customer.email || formattedPhoneNumber
+            }`,
+            addTagRes.data
+          );
+
+          // Log success
+          await ActivityLog.create({
+            user_id: customerLocation.user_id,
+            businessName: client.business_name,
+            eventType: "Success",
+            event: "Ticket and Customer Created in Syncro",
+            platform: "Syncro",
+            message: `${status} Tag added in HighLevel's customer <b>${
+              customer.email || formattedPhoneNumber
+            }</b>`,
+            customData: addTagRes.data,
+          });
+
+          return true; // Indicate success
+        } catch (error) {
+          console.error(error);
+
+          // Log failure
+          await ActivityLog.create({
+            user_id: customerLocation.user_id,
+            businessName: client.business_name,
+            eventType: "Failure",
+            event: "Ticket and Customer Created in Syncro",
+            platform: "Syncro",
+            message: `Error adding tag in HighLevel's Customer`,
+            customData: error.response ? error.response.data : error,
+          });
+        }
+      }
+    } catch (error) {
+      console.error(error.response);
+    }
+
+    return false; // Indicate failure
+  };
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const success = await findCustomerAndTagThem();
+
+    if (success) {
+      break; // Exit the loop if the tag was successfully added
+    }
+
+    // Wait before the next attempt
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, retryDelay));
+    }
+
+    if (!success && attempt == maxAttempts) {
+      // Log failure
+      await ActivityLog.create({
+        user_id: customerLocation.user_id,
+        businessName: client.business_name,
+        eventType: "Failure",
+        event: "Ticket Status Changed in Syncro",
+        platform: "Syncro",
+        message: `Customer not found in 3 Attempts`,
+        customData: null,
+      });
+    }
+  }
+
+  res.status(200).send("Webhook received successfully");
+  console.log("/////*******************************************/////");
+};
+
 // Ticket Status changed in Syncro
 const handleTicketStatusChanged = async (req, res) => {
   console.log("/////*******************************************/////");
@@ -289,6 +494,14 @@ const handleTicketStatusChanged = async (req, res) => {
   }
 
   try {
+    const phoneNumber =
+      customer?.phone?.replace(/[\s-]+/g, "") ||
+      customer?.mobile?.replace(/[\s-]+/g, "");
+    const formattedPhoneNumber =
+      phoneNumber && !phoneNumber.startsWith("+")
+        ? `+1${phoneNumber}` // Add country code if missing
+        : phoneNumber;
+
     const highlevelCustomerRes = await axios.post(
       "https://services.leadconnectorhq.com/contacts/search",
       {
@@ -305,10 +518,7 @@ const handleTicketStatusChanged = async (req, res) => {
             : {
                 field: "phone",
                 operator: "eq",
-                value:
-                  customer?.phone?.replace(/[\s-]+/g, "") ||
-                  customer?.mobile?.replace(/[\s-]+/g, "") ||
-                  "",
+                value: formattedPhoneNumber || "",
               },
         ],
       },
@@ -319,7 +529,7 @@ const handleTicketStatusChanged = async (req, res) => {
         },
       }
     );
-    // console.log("highlevelCustomerRes", highlevelCustomerRes.data);
+    console.log("highlevelCustomerRes", highlevelCustomerRes.data);
 
     const searchedCustomers = highlevelCustomerRes.data.contacts;
 
@@ -565,6 +775,7 @@ const handleInvoicePaid = async (req, res) => {
 
 module.exports = {
   handleCustomerCreation,
+  handleTicketCreated,
   handleTicketStatusChanged,
   handleInvoicePaid,
 };

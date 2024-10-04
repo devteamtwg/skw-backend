@@ -1078,7 +1078,7 @@ const handlePaymentAdded = async (req, res, text) => {
           },
         }
       );
-      console.log("highlevelCustomerRes", highlevelCustomerRes.data);
+      // console.log("highlevelCustomerRes", highlevelCustomerRes.data);
 
       const searchedCustomers = highlevelCustomerRes.data.contacts;
 
