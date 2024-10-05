@@ -92,11 +92,9 @@ const handleCustomerCreation = async (req, res) => {
             platform: "Highlevel",
             event: "Customer created in Highlevel",
             eventType: "Success",
-            message: `Existing Customer <b>${
-              res?.data?.data?.email ||
-              res?.data?.data?.phone ||
-              res?.data?.data?.mobile
-            }</b> updated in ${customerLocation.serviceUsing} successfully`,
+            message: `Customer <b>${
+              payload.email || payload.phone || payload.mobile
+            }</b> synced in ${customerLocation.serviceUsing} successfully`,
             customData: res.data,
           });
         } catch (error) {
@@ -127,7 +125,7 @@ const handleCustomerCreation = async (req, res) => {
     // Check if customer already exists in RepairDesk
     try {
       let findCustomerRes =
-        highlevelCustomer.email &&
+        payload.email &&
         (await axios.get(
           `https://api.repairdesk.co/api/web/v1/customers?api_key=${customerLocation.serviceApiKey}&keyword=${highlevelCustomer.email}`
         ));
@@ -136,11 +134,11 @@ const handleCustomerCreation = async (req, res) => {
         findCustomerRes == undefined ||
         findCustomerRes?.data?.data?.customerData?.length == 0
       ) {
-        if (highlevelCustomer.phone || highlevelCustomer.mobile) {
+        if (payload.phone || payload.mobile) {
           findCustomerRes = await axios.get(
             `https://api.repairdesk.co/api/web/v1/customers?api_key=${
               customerLocation.serviceApiKey
-            }&keyword=${highlevelCustomer.phone || highlevelCustomer.mobile}`
+            }&keyword=${payload.phone || payload.mobile}`
           );
         }
       }
@@ -177,9 +175,7 @@ const handleCustomerCreation = async (req, res) => {
             event: "Customer created in Highlevel",
             eventType: "Success",
             message: `Existing Customer <b>${
-              updateCustomerRes?.data?.data?.email ||
-              updateCustomerRes?.data?.data?.phone ||
-              updateCustomerRes?.data?.data?.mobile
+              payload.email || payload.phone || payload.mobile
             }</b> updated in ${customerLocation.serviceUsing} successfully`,
             customData: updateCustomerRes.data,
           });
@@ -216,9 +212,7 @@ const handleCustomerCreation = async (req, res) => {
             event: "Customer created in Highlevel",
             eventType: "Success",
             message: `Customer <b>${
-              createCustomerRes?.data?.data?.email ||
-              createCustomerRes?.data?.data?.phone ||
-              createCustomerRes?.data?.data?.mobile
+              payload.email || payload.phone || payload.mobile
             }</b> synced with ${customerLocation.serviceUsing} successfully`,
             customData: createCustomerRes.data,
           });
