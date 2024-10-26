@@ -92,12 +92,12 @@ const forget_password = (req,res) => {
 
                 const tokenss = await Token.create(tokenData) 
 
-                const clientURL = process.env.FRONT_URL
+                const clientURL = process.env.FRONT_URL;
                 const link = `${clientURL}/reset_password?token=${resetToken}&id=${user._id}`
-                
+
                 const respo = sendEmail(user.email,"Password Reset Request",{name: user.name,link: link,},"../template/requestResetPassword.handlebars")
                 
-                res.status(200).json({data:link,error:''})
+                res.status(200).json({data:"We have sent you an email with password reset link",error:''})
             }
             else{
                 res.status(200).json({data:null,error:'Something went wrong, Please try again!!'})
