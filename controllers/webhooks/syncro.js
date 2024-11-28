@@ -436,7 +436,7 @@ const handleTicketStatusChanged = async (req, res) => {
   );
 
   const syncroTicket = req.body;
-  const { customer, status } = syncroTicket.attributes;
+  const { customer, status } = syncroTicket?.attributes;
 
   const url = syncroTicket.link;
   const subdomain = url?.split(".")[0]?.replace("https://", "");
